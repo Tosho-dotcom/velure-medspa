@@ -1,0 +1,343 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* ------------------------------------------------------------------ *
+ * Velure design tokens (specs/velure_site_spec.json → design_tokens)
+ * Raw hex lives ONLY here. Components use bg-ivory, text-espresso, etc.
+ * ------------------------------------------------------------------ */
+:root {
+  --ivory: #faf6f1;
+  --sand: #efe6da;
+  --stone: #d9cbb8;
+  --taupe: #6f625a;
+  --espresso: #2b2420;
+  --espresso-deep: #1c1714;
+  --gold: #b08968;
+  --gold-light: #cdae8f;
+  --blush: #e8c4c4;
+  --ivory-on-dark: #f3ece3;
+
+  /* page theme, tweened on <body> by ThemeObserver */
+  --bg: var(--ivory);
+  --fg: var(--espresso);
+
+  --gutter: clamp(1rem, 4vw, 3.5rem);
+  --section-y: clamp(6rem, 14vh, 11rem);
+  --nav-h: 68px;
+
+  --shadow-soft: 0 30px 60px -30px rgb(43 36 32 / 0.25);
+
+  /* shadcn semantic tokens → Velure palette (form surfaces are dark) */
+  --background: var(--ivory);
+  --foreground: var(--espresso);
+  --card: var(--sand);
+  --card-foreground: var(--espresso);
+  --popover: var(--espresso);
+  --popover-foreground: var(--ivory-on-dark);
+  --primary: var(--gold-light);
+  --primary-foreground: var(--espresso-deep);
+  --secondary: var(--sand);
+  --secondary-foreground: var(--espresso);
+  --muted: var(--sand);
+  --muted-foreground: var(--taupe);
+  --accent: rgb(243 236 227 / 0.1);
+  --accent-foreground: var(--ivory-on-dark);
+  --destructive: #c26a5a;
+  --border: var(--stone);
+  --input: var(--stone);
+  --ring: var(--gold);
+  --radius: 0.875rem;
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --nav-h: 84px;
+  }
+}
+
+@theme inline {
+  --color-ivory: var(--ivory);
+  --color-sand: var(--sand);
+  --color-stone: var(--stone);
+  --color-taupe: var(--taupe);
+  --color-espresso: var(--espresso);
+  --color-espresso-deep: var(--espresso-deep);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-blush: var(--blush);
+  --color-ivory-on-dark: var(--ivory-on-dark);
+  --color-page: var(--bg);
+  --color-ink: var(--fg);
+
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-fraunces);
+
+  --radius-sm: 6px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans antialiased;
+    scroll-behavior: auto;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    overflow-x: clip;
+  }
+  ::selection {
+    background: var(--blush);
+    color: var(--espresso-deep);
+  }
+  :focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 3px;
+  }
+  em {
+    font-style: italic;
+  }
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* ------------------------------------------------------------------ *
+ * Typography helpers
+ * ------------------------------------------------------------------ */
+.font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 40;
+}
+.t-hero {
+  font-size: clamp(3.25rem, 8vw, 8.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  font-weight: 300;
+}
+.t-h2 {
+  font-size: clamp(2.5rem, 5vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-weight: 300;
+}
+.t-statement {
+  font-size: clamp(1.75rem, 3.4vw, 3.25rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  font-weight: 300;
+}
+.t-h3 {
+  font-size: clamp(1.5rem, 2.2vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 400;
+}
+.t-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+}
+
+/* ------------------------------------------------------------------ *
+ * Layout helpers
+ * ------------------------------------------------------------------ */
+.wrap {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+.section-y {
+  padding-block: var(--section-y);
+}
+
+@layer components {
+/* ------------------------------------------------------------------ *
+ * Buttons (fill wipe) and links (underline draw)
+ * ------------------------------------------------------------------ */
+.btn {
+  position: relative;
+  isolation: isolate;
+  border-radius: 999px;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.5s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.5s cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+.btn:hover::before,
+.btn:focus-visible::before {
+  transform: scaleY(1);
+}
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.btn:disabled::before {
+  transform: scaleY(0);
+}
+.btn-primary {
+  background: var(--fg);
+  color: var(--bg);
+}
+.btn-primary::before {
+  background: var(--gold);
+}
+.btn-primary:hover,
+.btn-primary:focus-visible {
+  color: var(--ivory);
+}
+.btn-secondary {
+  background: transparent;
+  color: inherit;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.btn-secondary::before {
+  background: currentColor;
+}
+.btn-secondary:hover,
+.btn-secondary:focus-visible {
+  color: var(--btn-inv, var(--bg));
+}
+.btn-secondary:hover > span,
+.btn-secondary:focus-visible > span {
+  color: var(--btn-inv, var(--bg));
+}
+
+.link-underline {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size 0.4s cubic-bezier(0.215, 0.61, 0.355, 1);
+  padding-bottom: 2px;
+}
+.link-underline:hover,
+.link-underline:focus-visible {
+  background-size: 100% 1px;
+}
+
+/* Inputs: bottom-border, gold line draws from the left on focus */
+.field {
+  position: relative;
+}
+.field::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.215, 0.61, 0.355, 1);
+  pointer-events: none;
+}
+.field:focus-within::after {
+  transform: scaleX(1);
+}
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion initial states. Content stays visible without JS and for
+ * reduced motion; GSAP animates these in when motion is allowed.
+ * ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: no-preference) {
+  html.js [data-reveal] {
+    opacity: 0;
+    visibility: hidden;
+  }
+  html.js [data-hairline] {
+    transform: scaleX(0);
+  }
+  html.js [data-hairline-y] {
+    transform: scaleY(0);
+  }
+}
+
+.scroll-cue-seg {
+  animation: scroll-cue 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes scroll-cue {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(300%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-cue-seg {
+    animation: none;
+    transform: translateY(0);
+  }
+}
+
+/* Analog warmth */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+/* Preloader: shown only when the inline script in layout.tsx adds html.intro */
+html.intro {
+  overflow: hidden;
+}
+html.intro .preloader {
+  display: flex;
+}

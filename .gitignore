@@ -3,3 +3,10 @@
 .env.local
 .vercel
 media-src
+/out
+.env*
+!.env.local.example
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+.claude
