@@ -2,4 +2,4 @@
 .next
 .env.local
 .vercel
-public/media/*.mp4
+media-src

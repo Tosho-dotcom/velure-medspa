@@ -74,17 +74,17 @@
 
   "assets": {
     "folder": "public/media",
-    "hero_video_desktop": { "file": "hero-desktop.mp4", "ratio": "16:9", "poster": "hero-desktop-poster.png" },
-    "hero_video_mobile": { "file": "hero-mobile.mp4", "ratio": "9:16", "poster": "hero-mobile-poster.png" },
-    "menu_reveal": { "file": "menu-reveal.png", "ratio": "16:9", "alt": "Travertine basin with still water and linen in warm morning light" },
-    "booking_image": { "file": "booking-reception.png", "ratio": "3:4", "alt": "Travertine reception desk with an olive branch and an appointment book" },
+    "hero_video_desktop": { "file": "hero-desktop.mp4", "ratio": "16:9", "poster": "hero-desktop-poster.webp" },
+    "hero_video_mobile": { "file": "hero-mobile.mp4", "ratio": "9:16", "poster": "hero-mobile-poster.webp" },
+    "menu_reveal": { "file": "menu-reveal.webp", "ratio": "16:9", "alt": "Travertine basin with still water and linen in warm morning light" },
+    "booking_image": { "file": "booking-reception.webp", "ratio": "3:4", "alt": "Travertine reception desk with an olive branch and an appointment book" },
     "treatments": [
-      { "id": "signature-glow-facial", "file": "treatment-01-facial.png", "alt": "Hydrating serum applied with a fan brush during a facial" },
-      { "id": "wrinkle-relaxers", "file": "treatment-02-injectables.png", "alt": "Gloved hands holding a glass syringe beside amber vials on travertine" },
-      { "id": "dermal-fillers", "file": "treatment-03-fillers.png", "alt": "Close-up of natural lips and jawline in warm light" },
-      { "id": "collagen-microneedling", "file": "treatment-04-microneedling.png", "alt": "Microneedling pen on folded linen beside a serum bottle" },
-      { "id": "laser-rejuvenation", "file": "treatment-05-laser.png", "alt": "Laser handpiece glowing softly near a client's cheek" },
-      { "id": "body-contouring", "file": "treatment-06-body.png", "alt": "Body contouring applicator resting on an ivory robe" }
+      { "id": "signature-glow-facial", "file": "treatment-01-facial.webp", "alt": "Hydrating serum applied with a fan brush during a facial" },
+      { "id": "wrinkle-relaxers", "file": "treatment-02-injectables.webp", "alt": "Gloved hands holding a glass syringe beside amber vials on travertine" },
+      { "id": "dermal-fillers", "file": "treatment-03-fillers.webp", "alt": "Close-up of natural lips and jawline in warm light" },
+      { "id": "collagen-microneedling", "file": "treatment-04-microneedling.webp", "alt": "Microneedling pen on folded linen beside a serum bottle" },
+      { "id": "laser-rejuvenation", "file": "treatment-05-laser.webp", "alt": "Laser handpiece glowing softly near a client's cheek" },
+      { "id": "body-contouring", "file": "treatment-06-body.webp", "alt": "Body contouring applicator resting on an ivory robe" }
     ],
     "rules": "Use next/image for all stills (sizes attribute set per layout). Videos: autoplay muted loop playsInline, preload='metadata', poster required. Load ONLY the matching video: choose src on mount via matchMedia('(max-aspect-ratio: 4/5)') — never render both <video> sources."
   },
@@ -293,7 +293,7 @@
   "seo": {
     "title": "Velure Med Spa — Radiance, refined. | Scottsdale, AZ",
     "description": "Velure is a physician-led med spa in Scottsdale offering signature facials, injectables, microneedling, laser and body contouring. Book online in under a minute.",
-    "og_image": "Generate 1200×630 from menu-reveal.png with the wordmark (app/opengraph-image.tsx).",
+    "og_image": "Generate 1200×630 from menu-reveal.webp with the wordmark (app/opengraph-image.tsx).",
     "schema_org": "MedicalBusiness JSON-LD with name, address, openingHours, priceRange '$$$'. Mark as demo in description."
   },
 

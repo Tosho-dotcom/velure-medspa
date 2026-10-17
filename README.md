@@ -36,10 +36,10 @@ velure-build-kit/
 | Datoteka | Namjena |
 |---|---|
 | hero-desktop.mp4 / hero-mobile.mp4 | Hero loop, 10 s, 1080p, bez zvuka (16:9 i 9:16) |
-| hero-*-poster.png | Poster i LCP slika za hero |
-| menu-reveal.png | Panel koji se otvara u sekciji The Menu |
+| hero-*-poster.webp | Poster i LCP slika za hero |
+| menu-reveal.webp | Panel koji se otvara u sekciji The Menu |
 | treatment-01 … 06 | Hover/accordion slike tretmana |
-| booking-reception.png | Slika uz booking sekciju |
+| booking-reception.webp | Slika uz booking sekciju |
 
 Videi su generirani sa start i end frameom na istoj slici, pa bi loop trebao biti bez reza. Prije ugradnje ga ipak pogledaj u petlji. Ako je datoteka veća od ~6 MB, komprimiraj je ffmpeg naredbom s dna skripte (ili HandBrakeom).
 
