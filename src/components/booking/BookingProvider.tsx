@@ -14,6 +14,8 @@ type BookingApi = {
   /** Open the booking panel, optionally with a treatment preselected. */
   open: (treatmentId?: string) => void;
   close: () => void;
+  /** True while the panel is open (the nav hides itself behind it). */
+  isOpen: boolean;
 };
 
 const BookingContext = createContext<BookingApi | null>(null);
@@ -34,7 +36,7 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   }, []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  const api = useMemo(() => ({ open, close }), [open, close]);
+  const api = useMemo(() => ({ open, close, isOpen }), [open, close, isOpen]);
 
   return (
     <BookingContext.Provider value={api}>

@@ -113,10 +113,11 @@ export function Nav() {
         ref={barRef}
         data-reveal
         className={cn(
-          "fixed inset-x-0 top-0 z-[80] h-[var(--nav-h)] transition-[transform,background-color,color,border-color] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          "fixed inset-x-0 top-0 z-[80] h-[var(--nav-h)] transition-[transform,opacity,background-color,color,border-color] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
           tone,
           vars,
           hidden && !menuOpen && "-translate-y-full",
+          booking.isOpen && "pointer-events-none opacity-0!",
         )}
       >
         <nav
