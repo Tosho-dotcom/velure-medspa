@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
@@ -35,20 +35,43 @@ export function Hero() {
 
   // The visitor's choice wins; otherwise reduced motion starts paused.
   const [userPaused, setUserPaused] = useState<boolean | null>(null);
-  const paused = userPaused ?? reduceMotion;
+  const wantsPlayback = !(userPaused ?? reduceMotion);
+  const [playing, setPlaying] = useState(false);
   const [readyFor, setReadyFor] = useState<Variant | null>(null);
   const ready = readyFor === variant;
+
+  // React does not reliably reflect `muted` as an attribute, so browsers can
+  // block the autoplay attribute, and Chrome pauses background video to save
+  // power. Start playback explicitly and resume whenever the hero is visible.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !variant) return;
+    v.muted = true;
+    if (!wantsPlayback) {
+      v.pause();
+      return;
+    }
+    const play = () => void v.play().catch(() => {});
+    play();
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && v.paused) play();
+      },
+      { threshold: 0.25 },
+    );
+    io.observe(v);
+    const onVisible = () => document.visibilityState === "visible" && v.paused && play();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      io.disconnect();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [variant, wantsPlayback]);
 
   const togglePlayback = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) {
-      void v.play();
-      setUserPaused(false);
-    } else {
-      v.pause();
-      setUserPaused(true);
-    }
+    setUserPaused(!v.paused);
   };
 
   useGSAP(
@@ -167,6 +190,8 @@ export function Hero() {
               poster={src.poster}
               onLoadedMetadata={() => ScrollTrigger.refresh()}
               onCanPlay={() => setReadyFor(variant)}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
               className={`absolute inset-0 size-full object-cover transition-opacity duration-700 ${
                 ready ? "opacity-100" : "opacity-0"
               }`}
@@ -237,13 +262,13 @@ export function Hero() {
       <button
         type="button"
         onClick={togglePlayback}
-        aria-label={paused ? "Play background video" : "Pause background video"}
+        aria-label={playing ? "Pause background video" : "Play background video"}
         className="absolute bottom-6 left-[var(--gutter)] z-20 inline-flex size-10 items-center justify-center rounded-full border border-ivory/40 text-ivory transition-colors hover:border-gold-light hover:text-gold-light"
       >
-        {paused ? (
-          <PlayIcon className="size-4" strokeWidth={1.25} />
-        ) : (
+        {playing ? (
           <PauseIcon className="size-4" strokeWidth={1.25} />
+        ) : (
+          <PlayIcon className="size-4" strokeWidth={1.25} />
         )}
       </button>
 
