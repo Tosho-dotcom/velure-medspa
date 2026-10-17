@@ -1,0 +1,526 @@
+{
+  "name": "Velure — Subscribe",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "velure-subscribe",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:3000,https://velure-medspa.vercel.app"
+        }
+      },
+      "id": "a5c41fd3-17ce-48b4-821a-0027d32fe716",
+      "name": "Subscribe Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "4f3b6f00-4f55-4182-8b26-4854bf7d8788"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = ($input.first().json.body) || {};\nconst s = (v) => (typeof v === 'string' ? v.trim() : '');\nif (s(b.company)) return [{ json: { honeypot: true, valid: false } }];\nconst email = s(b.email).toLowerCase();\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email)) return [{ json: { honeypot: false, valid: false, errors: { email: 'Please enter a valid email' } } }];\nreturn [{ json: { honeypot: false, valid: true, email, today: new Date().toISOString().slice(0, 10) } }];"
+      },
+      "id": "19a91bb6-8b4e-481f-8be6-24fb94b6fac7",
+      "name": "Validate Email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "5701aecf-6a40-442c-95be-47d6de71bcb8",
+              "leftValue": "={{ $json.honeypot }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0533c4a5-c811-46fe-8da0-8b7d5f92648d",
+      "name": "Honeypot?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "ed626d05-9560-450e-b149-f712ca510d54",
+      "name": "Respond Silent OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c559215c-a9ee-4d4d-8b5c-30ed311a5fac",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c67329c4-94d8-4215-ac8a-64287336e7aa",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"validation\", errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "c81f5d6b-f1a2-4f5f-baec-db6c65cfc7b6",
+      "name": "Respond 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_NEWSLETTER_DB_ID",
+          "mode": "id"
+        },
+        "limit": 1,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Email|email",
+              "condition": "equals",
+              "emailValue": "={{ $json.email }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "12c0020b-a5bd-468f-9366-8c18a09fa071",
+      "name": "Find Subscriber",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "f828249b-c510-49b1-9df0-ee19cab34942",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "de045ff5-97e4-4eb0-9a25-a4f50c169a05",
+      "name": "Already Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Status|select",
+              "selectValue": "Active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "99b4c576-6dd0-444b-a69a-91d180f4f277",
+      "name": "Reactivate",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        160
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, duplicate: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "bdabf9b2-80fe-4954-a142-e42715f94563",
+      "name": "Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_NEWSLETTER_DB_ID",
+          "mode": "id"
+        },
+        "title": "={{ $('Validate Email').first().json.email }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $('Validate Email').first().json.email }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "Active"
+            },
+            {
+              "key": "Date subscribed|date",
+              "includeTime": false,
+              "date": "={{ $('Validate Email').first().json.today }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a47ba98c-0bb3-4351-a127-ecd71eed214b",
+      "name": "Create Subscriber",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        400
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "9ddfa0c5-b3fa-4d3d-8f31-ce3128637e33",
+      "name": "Respond 200",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "minutes"
+      },
+      "id": "65037194-16a4-4332-8113-1d6b288b4411",
+      "name": "Wait 2 min",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1760,
+        400
+      ],
+      "webhookId": "3afdff5b-eb47-4c45-a400-13d5521f9400"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared Velure email shell (inline styles only — email clients ignore <style> blocks)\nconst shell = (title, bodyHtml) => `<!doctype html><html><body style=\"margin:0;padding:0;background:#FAF6F1;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FAF6F1;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#FFFFFF;border:1px solid #EFE6DA;border-radius:14px;\">\n<tr><td style=\"padding:40px 40px 8px 40px;font-family:Georgia,'Times New Roman',serif;font-size:26px;letter-spacing:-0.5px;color:#2B2420;\">Velure</td></tr>\n<tr><td style=\"padding:0 40px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#B08968;\">Med Spa &middot; Scottsdale</td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;\"><div style=\"height:1px;background:#EFE6DA;line-height:1px;\">&nbsp;</div></td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#2B2420;\">${title}</td></tr>\n<tr><td style=\"padding:16px 40px 36px 40px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#4A3F39;\">${bodyHtml}</td></tr>\n</table>\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;\">\n<tr><td style=\"padding:20px 8px;font-family:Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8A7D74;text-align:center;\">\nVelure Med Spa &middot; 1200 Desert Bloom Ave, Scottsdale, AZ &middot; (480) 555-0142<br>\nVelure is a fictional brand created as a demonstration project by <a href=\"https://thaus.co\" style=\"color:#8A7D74;\">Thaus</a>.\n</td></tr></table>\n</td></tr></table></body></html>`;\nconst esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst row = (k, v) => `<tr><td style=\"padding:6px 0;color:#8A7D74;width:120px;vertical-align:top;\">${k}</td><td style=\"padding:6px 0;color:#2B2420;\">${v}</td></tr>`;\n\nconst email = $('Validate Email').first().json.email;\nconst unsub = `https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=${encodeURIComponent(email)}`;\nconst html = shell('Welcome to The Velure Letter.',\n  `<p style=\"margin:0 0 14px 0;\">Thank you for subscribing. A few times a month you will receive honest skin notes from our team — seasonal treatments, simple routines that work, and first access to new openings.</p>\n   <p style=\"margin:0 0 14px 0;\">No noise, no pressure. Just good skin, considered.</p>\n   <p style=\"margin:22px 0 0 0;color:#2B2420;\">With care,<br>The Velure team</p>\n   <p style=\"margin:28px 0 0 0;font-size:12px;color:#8A7D74;\">Changed your mind? <a href=\"${unsub}\" style=\"color:#8A7D74;\">Unsubscribe</a> at any time.</p>`);\nreturn [{ json: { email, html, subject: 'Welcome to The Velure Letter' } }];"
+      },
+      "id": "db0afd6f-277c-4eda-812e-2622ca24626c",
+      "name": "Build Welcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "Velure Med Spa <owner@example.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "owner@example.com"
+        }
+      },
+      "id": "9e021591-3ffe-45c8-85d2-56416aeab82d",
+      "name": "Send Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2200,
+        400
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Subscribe Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Email": {
+      "main": [
+        [
+          {
+            "node": "Honeypot?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Honeypot?": {
+      "main": [
+        [
+          {
+            "node": "Respond Silent OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Find Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Already Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already Exists?": {
+      "main": [
+        [
+          {
+            "node": "Reactivate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reactivate": {
+      "main": [
+        [
+          {
+            "node": "Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Subscriber": {
+      "main": [
+        [
+          {
+            "node": "Respond 200",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200": {
+      "main": [
+        [
+          {
+            "node": "Wait 2 min",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2 min": {
+      "main": [
+        [
+          {
+            "node": "Build Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Welcome": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

@@ -1,0 +1,131 @@
+{
+  "meta": {
+    "component": "BookingForm (used in BookingPanel Sheet and inline in #book section)",
+    "version": "1.0",
+    "date": "2026-10-17",
+    "model": "Instant-confirm booking request. No external calendar. n8n checks the slot against Notion and confirms or rejects. Phase 2 (later episodes) adds reminder and review-request workflows on top of the same Notion database."
+  },
+
+  "business_rules": {
+    "timezone": "America/Phoenix (Arizona does not observe DST — all times shown and stored in this zone)",
+    "open_days": "Monday–Saturday (Sunday closed)",
+    "hours": "09:00–19:00",
+    "slot_length_minutes": 30,
+    "last_start_time": "18:00",
+    "bookable_window": "from tomorrow up to 60 days ahead",
+    "slots": ["09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00"],
+    "capacity": "1 booking per slot (demo). Slot uniqueness key = `${date}T${time}` e.g. 2026-10-21T10:30",
+    "treatments_source": "src/lib/treatments.ts (same 6 as site spec) + extra option { id: 'consultation', name: 'Consultation — not sure yet', duration: '30 min' }"
+  },
+
+  "ui": {
+    "header": {
+      "eyebrow": "Book now",
+      "title": "Reserve your <em>visit</em>",
+      "text": "Takes under a minute. You'll receive a confirmation by email right away."
+    },
+    "steps_note": "Single scrolling form inside the panel, visually grouped into three blocks with small gold numerals: 01 Treatment · 02 Date & time · 03 Your details. Not a multi-page wizard.",
+    "fields": [
+      { "name": "treatmentId", "label": "Treatment", "control": "Select (shadcn)", "required": true, "default": "preselected when opened from a treatment row, else empty", "options": "treatments + consultation" },
+      { "name": "date", "label": "Preferred date", "control": "Calendar in Popover (shadcn). Disable past days, today, Sundays and dates > 60 days ahead. Display format 'Tue, Oct 21'.", "required": true, "value_format": "YYYY-MM-DD" },
+      { "name": "time", "label": "Preferred time", "control": "Grid of time chips (radio group), 3 columns on mobile / 4 on desktop. Disabled until a date is chosen.", "required": true, "value_format": "HH:mm (24h); display '10:30 AM'" },
+      { "name": "firstName", "label": "First name", "control": "Input", "required": true, "max": 50 },
+      { "name": "lastName", "label": "Last name", "control": "Input", "required": true, "max": 50 },
+      { "name": "email", "label": "Email", "control": "Input type=email", "required": true },
+      { "name": "phone", "label": "Phone", "control": "Input type=tel", "required": true, "validation": "7–20 chars, digits, spaces, +, -, ( ) only" },
+      { "name": "firstVisit", "label": "This is my first visit to Velure", "control": "Checkbox", "required": false, "default": true },
+      { "name": "notes", "label": "Anything we should know? (optional)", "control": "Textarea, 3 rows", "required": false, "max": 500 },
+      { "name": "consent", "label": "I agree to be contacted by email about this appointment. Velure is a demo project by Thaus.", "control": "Checkbox", "required": true },
+      { "name": "company", "label": "", "control": "Honeypot: visually hidden input, tabIndex -1, autocomplete off, aria-hidden. Must stay empty.", "required": false }
+    ],
+    "submit": { "label": "Confirm booking", "loading_label": "Confirming…" },
+    "summary_bar": "Sticky bottom bar inside the panel showing the live selection: '<Treatment> · Tue, Oct 21 · 10:30 AM' + submit button.",
+    "states": {
+      "idle": "default",
+      "loading": "button shows spinner + loading label, all fields disabled",
+      "success": "Form content cross-fades to a confirmation view: gold check line-drawing (SVG stroke-dashoffset), title 'You're booked.', text 'We've sent a confirmation to {email}. See you on {date} at {time}.', buttons 'Add another booking' (reset) and 'Close'.",
+      "slot_taken": "HTTP 409 → inline message above time grid: 'That time was just taken — please choose another.' Disable that chip locally and keep all other values.",
+      "validation_error": "HTTP 400 → map returned `errors` to fields; otherwise generic message.",
+      "network_error": "'We couldn't reach our booking system. Please try again, or call (480) 555-0142.' Keep form values."
+    }
+  },
+
+  "validation_schema_zod": {
+    "treatmentId": "z.string().min(1, 'Please choose a treatment')",
+    "date": "z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/) + refine: not Sunday, between tomorrow and +60 days (Phoenix time)",
+    "time": "z.enum(SLOTS)",
+    "firstName": "z.string().trim().min(1).max(50)",
+    "lastName": "z.string().trim().min(1).max(50)",
+    "email": "z.string().trim().email()",
+    "phone": "z.string().trim().regex(/^[0-9+()\\-\\s]{7,20}$/)",
+    "firstVisit": "z.boolean()",
+    "notes": "z.string().max(500).optional()",
+    "consent": "z.literal(true, { errorMap: () => ({ message: 'Please confirm to continue' }) })",
+    "company": "z.string().max(0).optional()"
+  },
+
+  "request": {
+    "method": "POST",
+    "url_env": "NEXT_PUBLIC_N8N_BOOKING_WEBHOOK",
+    "headers": { "Content-Type": "application/json" },
+    "timeout_ms": 15000,
+    "body_example": {
+      "treatmentId": "collagen-microneedling",
+      "treatmentName": "Collagen Microneedling",
+      "date": "2026-10-21",
+      "time": "10:30",
+      "firstName": "Jane",
+      "lastName": "Doe",
+      "email": "jane@example.com",
+      "phone": "+1 480 555 0199",
+      "firstVisit": true,
+      "notes": "",
+      "consent": true,
+      "company": "",
+      "source": "velure-web",
+      "submittedAt": "2026-10-17T10:15:00.000Z",
+      "timezone": "America/Phoenix"
+    }
+  },
+
+  "responses": {
+    "200": { "ok": true, "bookingId": "VEL-20261021-1030-4F2A", "status": "confirmed" },
+    "400": { "ok": false, "error": "validation", "errors": { "email": "Invalid email" } },
+    "409": { "ok": false, "error": "slot_taken" },
+    "honeypot_filled": "n8n returns 200 { ok: true } silently and stores nothing (do not tip off bots)",
+    "5xx_or_timeout": "client shows network_error state"
+  },
+
+  "client_implementation_notes": [
+    "Submit helper in src/lib/submit.ts: postJSON(urlEnv, body, { timeoutMs }) using fetch + AbortController; returns { status, data }.",
+    "Never trust the client: n8n re-validates everything (see n8n/velure_booking_workflow.json).",
+    "When the panel opens with a treatment preselected, focus the date trigger; otherwise focus the treatment select.",
+    "Persist an unsent draft in sessionStorage (wrapped in try/catch) so closing the panel by accident does not lose input; clear on success.",
+    "Track a lightweight analytics event (Vercel Analytics custom event 'booking_submitted') on success only."
+  ],
+
+  "notion_database": {
+    "name": "Velure — Bookings",
+    "properties": {
+      "Client": "title — '{firstName} {lastName}'",
+      "Email": "email",
+      "Phone": "phone_number",
+      "Treatment": "select (6 treatments + Consultation)",
+      "Appointment": "date (date + time, America/Phoenix)",
+      "Slot key": "rich_text — '2026-10-21T10:30' (used for double-booking check)",
+      "Status": "select — Confirmed | Completed | Cancelled | No-show",
+      "First visit": "checkbox",
+      "Notes": "rich_text",
+      "Booking ID": "rich_text",
+      "Reminder sent": "checkbox (phase 2)",
+      "Review requested": "checkbox (phase 2)",
+      "Source": "select — velure-web"
+    }
+  },
+
+  "phase_2_hooks": {
+    "reminder_workflow": "Schedule (hourly) → Notion query: Status=Confirmed, Reminder sent=false, Appointment within next 24h → email reminder → set Reminder sent=true.",
+    "review_workflow": "Schedule (daily 19:30 Phoenix) → Notion query: Status=Completed, Review requested=false → review-request email → set Review requested=true.",
+    "note": "Planned for content episodes EP 14 and EP 15. Not part of the first build."
+  }
+}

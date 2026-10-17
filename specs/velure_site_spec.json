@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "project": "Velure Med Spa",
+    "studio": "Thaus — Project #001",
+    "version": "2.0",
+    "date": "2026-10-17",
+    "type": "single-page marketing site with live booking, contact and newsletter backed by n8n",
+    "language": "en-US",
+    "reference": "Layout rhythm inspired by dhunwellness.com (video hero, 'The Menu' services reveal). No content, imagery or code is copied from the reference.",
+    "disclosure": "Velure is a fictional brand built as a public demo. The footer and all automated emails must say so."
+  },
+
+  "stack": {
+    "framework": "Next.js (latest stable, App Router, src/ directory)",
+    "language": "TypeScript (strict)",
+    "styling": "Tailwind CSS v4 with CSS variables as design tokens",
+    "ui": "shadcn/ui — Sheet (booking panel), Select, Calendar/Popover, Checkbox, Input, Textarea, Label, Sonner (toasts)",
+    "motion": "gsap + ScrollTrigger + SplitText via @gsap/react (useGSAP); lenis for smooth scroll",
+    "forms": "react-hook-form + zod (shared schema per form)",
+    "icons": "lucide-react (thin 1.25 stroke)",
+    "fonts": "next/font/google — Fraunces (display, variable opsz + SOFT axis) and Inter (body)",
+    "hosting": "Vercel (Hobby), new GitHub repo separate from thaus",
+    "notes": "Do not add Framer Motion. All scroll choreography lives in GSAP so there is one timing system."
+  },
+
+  "brand": {
+    "name": "Velure",
+    "full_name": "Velure Med Spa",
+    "tagline": "Radiance, refined.",
+    "location_label": "Scottsdale, Arizona",
+    "voice": "Calm, precise, warm. Short sentences. Never salesy, never exclamation marks. Clinical credibility with a soft hand.",
+    "wordmark": "Text wordmark 'Velure' set in Fraunces, weight 400, letter-spacing -0.02em, optical size high. Small 'MED SPA' in Inter 11px, tracking 0.32em, under or beside it."
+  },
+
+  "design_tokens": {
+    "colors": {
+      "ivory": { "hex": "#FAF6F1", "use": "page background" },
+      "sand": { "hex": "#EFE6DA", "use": "surfaces, cards, alternating sections" },
+      "stone": { "hex": "#D9CBB8", "use": "hairlines, borders, dividers" },
+      "taupe": { "hex": "#6F625A", "use": "secondary text on light" },
+      "espresso": { "hex": "#2B2420", "use": "primary text, primary buttons" },
+      "espresso_deep": { "hex": "#1C1714", "use": "dark sections (booking, footer), overlays" },
+      "gold": { "hex": "#B08968", "use": "accent: numbers, rules, focus rings, hover states. Decorative/large text only on ivory (contrast ~3:1). On espresso_deep it passes for body text." },
+      "gold_light": { "hex": "#CDAE8F", "use": "accent on dark backgrounds" },
+      "blush": { "hex": "#E8C4C4", "use": "very sparing soft accent: selection color, success state tint" },
+      "ivory_on_dark": { "hex": "#F3ECE3", "use": "text on espresso_deep" }
+    },
+    "typography": {
+      "display": "Fraunces — weights 300/400, italic used for single accent words (e.g. 'refined.')",
+      "body": "Inter — 400/500",
+      "scale": {
+        "hero": "clamp(3.25rem, 8vw, 8.5rem) / line-height 0.95 / tracking -0.03em",
+        "h2": "clamp(2.5rem, 5vw, 5rem) / 1.0 / -0.02em",
+        "statement": "clamp(1.75rem, 3.4vw, 3.25rem) / 1.2 / -0.01em",
+        "h3": "clamp(1.5rem, 2.2vw, 2.25rem) / 1.15",
+        "body": "1rem–1.0625rem / 1.65",
+        "eyebrow": "0.6875rem Inter 500 uppercase tracking 0.32em, color taupe or gold"
+      }
+    },
+    "layout": {
+      "max_width": "1440px",
+      "gutter": "clamp(1rem, 4vw, 3.5rem)",
+      "section_padding_y": "clamp(6rem, 14vh, 11rem)",
+      "radius": { "sm": "6px", "md": "14px", "lg": "24px", "pill": "999px" },
+      "shadow_soft": "0 30px 60px -30px rgba(43,36,32,0.25)",
+      "grain": "Optional 3% SVG noise overlay fixed on body for analog warmth (pointer-events none)."
+    },
+    "buttons": {
+      "primary": "pill, espresso bg, ivory text, 52px tall, px-7. Hover: gold fill wipes up from bottom (pseudo-element scaleY 0→1, 0.5s power3.out), text color stays ivory.",
+      "secondary": "pill, transparent, 1px current-color border. Hover: fill wipe with ivory/espresso inverse.",
+      "text_link": "underline drawn by background-size 0→100% on hover, 0.4s"
+    }
+  },
+
+  "assets": {
+    "folder": "public/media",
+    "hero_video_desktop": { "file": "hero-desktop.mp4", "ratio": "16:9", "poster": "hero-desktop-poster.png" },
+    "hero_video_mobile": { "file": "hero-mobile.mp4", "ratio": "9:16", "poster": "hero-mobile-poster.png" },
+    "menu_reveal": { "file": "menu-reveal.png", "ratio": "16:9", "alt": "Travertine basin with still water and linen in warm morning light" },
+    "booking_image": { "file": "booking-reception.png", "ratio": "3:4", "alt": "Travertine reception desk with an olive branch and an appointment book" },
+    "treatments": [
+      { "id": "signature-glow-facial", "file": "treatment-01-facial.png", "alt": "Hydrating serum applied with a fan brush during a facial" },
+      { "id": "wrinkle-relaxers", "file": "treatment-02-injectables.png", "alt": "Gloved hands holding a glass syringe beside amber vials on travertine" },
+      { "id": "dermal-fillers", "file": "treatment-03-fillers.png", "alt": "Close-up of natural lips and jawline in warm light" },
+      { "id": "collagen-microneedling", "file": "treatment-04-microneedling.png", "alt": "Microneedling pen on folded linen beside a serum bottle" },
+      { "id": "laser-rejuvenation", "file": "treatment-05-laser.png", "alt": "Laser handpiece glowing softly near a client's cheek" },
+      { "id": "body-contouring", "file": "treatment-06-body.png", "alt": "Body contouring applicator resting on an ivory robe" }
+    ],
+    "rules": "Use next/image for all stills (sizes attribute set per layout). Videos: autoplay muted loop playsInline, preload='metadata', poster required. Load ONLY the matching video: choose src on mount via matchMedia('(max-aspect-ratio: 4/5)') — never render both <video> sources."
+  },
+
+  "navigation": {
+    "position": "fixed top, full width, height 84px desktop / 68px mobile",
+    "left": "Velure wordmark (scrolls to top)",
+    "links": [
+      { "label": "Treatments", "target": "#treatments" },
+      { "label": "The Ritual", "target": "#ritual" },
+      { "label": "Contact", "target": "#contact" }
+    ],
+    "cta": { "label": "Book now", "action": "open booking panel (Sheet, right side)" },
+    "states": {
+      "over_hero": "transparent, ivory text, hairline hidden",
+      "scrolled": "after 85vh: background ivory at 82% opacity with backdrop-blur(14px), espresso text, 1px stone hairline bottom. Transition 0.4s.",
+      "over_dark_sections": "when a section with data-theme='dark' is under the nav, switch text to ivory and background to espresso_deep/80",
+      "hide_on_scroll": "translateY(-100%) when scrolling down past 120vh, back to 0 on scroll up. 0.45s power3.out."
+    },
+    "anchor_scrolling": "All links use lenis.scrollTo(target, { offset: -84, duration: 1.6, easing: easeInOutExpo })",
+    "mobile": "Hamburger (two thin lines morphing to X). Opens full-screen espresso_deep overlay; links 2.75rem Fraunces stagger in from yPercent 100 (0.07s stagger); 'Book now' as full-width pill at bottom; address + hours small at bottom. Body scroll locked (lenis.stop())."
+  },
+
+  "sections": [
+    {
+      "id": "preloader",
+      "behavior": "Shown once per browser session (sessionStorage key 'velure_intro'). Full-screen ivory panel, centered 'Velure' wordmark. Total ≤ 1.6s. Skipped entirely with prefers-reduced-motion.",
+      "content": { "wordmark": "Velure", "sub": "Radiance, refined." }
+    },
+    {
+      "id": "hero",
+      "height": "100svh",
+      "background": "hero video (see assets) with overlay: linear-gradient(180deg, rgba(28,23,20,0.10) 0%, rgba(28,23,20,0.05) 45%, rgba(28,23,20,0.55) 100%)",
+      "layout": "content anchored bottom-left on desktop (padding-bottom 10vh); centered-bottom on mobile",
+      "content": {
+        "eyebrow": "Med Spa · Scottsdale, Arizona",
+        "headline": "Radiance, <em>refined.</em>",
+        "subline": "Clinical expertise, unhurried care. Treatments shaped around your skin — and your schedule.",
+        "cta_primary": { "label": "Book a consultation", "action": "open booking panel" },
+        "cta_secondary": { "label": "Explore treatments", "target": "#treatments" },
+        "scroll_cue": "bottom-right: tiny 'Scroll' label + 48px vertical hairline with a gold segment travelling down on loop (2.4s)"
+      }
+    },
+    {
+      "id": "philosophy",
+      "theme": "light (ivory)",
+      "layout": "12-col grid; eyebrow in col 1–3, statement col 4–12. Below: three short pillars in a row separated by stone hairlines.",
+      "content": {
+        "eyebrow": "Our philosophy",
+        "statement": "Great skin is not an event. It is a quiet ritual — precise, personal, and practised over time.",
+        "pillars": [
+          { "title": "Medical precision", "text": "Every treatment is planned and delivered by a licensed medical team." },
+          { "title": "Personal plans", "text": "No menus of upsells. One plan, built for your skin and your goals." },
+          { "title": "Unhurried care", "text": "Private suites, generous appointment times, and nothing rushed." }
+        ]
+      }
+    },
+    {
+      "id": "treatments",
+      "name": "The Menu",
+      "theme": "starts light, panel reveal turns it dark, list returns to light",
+      "structure": [
+        "Part A — pinned reveal stage (100vh): menu-reveal image expands from a small rounded window to full-bleed (see motion.menu_reveal). Over the expanded image: eyebrow 'The Menu', headline 'Treatments, <em>considered.</em>', intro line.",
+        "Part B — treatment list on ivory: six full-width rows. Row = [number 01–06 in gold] [name in Fraunces h3] [one-line description, hidden on mobile until expanded] [duration] [price 'from $X'] [arrow icon]. Hairline stone dividers.",
+        "Desktop hover: cursor-following image preview (treatment photo, 320×400, radius md) appears near pointer.",
+        "Mobile: rows become an accordion; expanded row shows image (4:5), description, duration, price and a 'Book this treatment' text button that opens the booking panel with that treatment preselected.",
+        "Every row is clickable and opens the booking panel with treatment preselected."
+      ],
+      "content": {
+        "eyebrow": "The Menu",
+        "headline": "Treatments, <em>considered.</em>",
+        "intro": "Six signature treatments. Each begins with a consultation and ends with a plan made for you.",
+        "footnote": "Final pricing is confirmed at consultation. Prices in USD."
+      },
+      "treatments": [
+        { "n": "01", "id": "signature-glow-facial", "name": "Signature Glow Facial", "description": "A deeply hydrating, multi-step facial that cleanses, exfoliates and infuses — for skin that looks rested, not treated.", "duration": "60 min", "price": "from $195" },
+        { "n": "02", "id": "wrinkle-relaxers", "name": "Wrinkle Relaxers", "description": "Precise neuromodulator treatment that softens expression lines while keeping your face entirely your own.", "duration": "30 min", "price": "from $14 / unit" },
+        { "n": "03", "id": "dermal-fillers", "name": "Dermal Fillers", "description": "Restores volume and definition to lips, cheeks and jawline with a subtle, balanced hand.", "duration": "45 min", "price": "from $650" },
+        { "n": "04", "id": "collagen-microneedling", "name": "Collagen Microneedling", "description": "Controlled micro-channels stimulate your own collagen for smoother texture and refined pores.", "duration": "75 min", "price": "from $425" },
+        { "n": "05", "id": "laser-rejuvenation", "name": "Laser Rejuvenation", "description": "Light-based treatment for sun damage, uneven tone and fine lines — with minimal downtime.", "duration": "45 min", "price": "from $350" },
+        { "n": "06", "id": "body-contouring", "name": "Body Contouring", "description": "Non-invasive sculpting for stubborn areas. No needles, no recovery time.", "duration": "60 min", "price": "from $500" }
+      ]
+    },
+    {
+      "id": "ritual",
+      "name": "The Velure Ritual",
+      "theme": "sand background",
+      "layout": "Heading left, then three columns (stacked on mobile) connected by one horizontal hairline that draws on scroll. Each step: large gold numeral (Fraunces 300, 5rem), title, text.",
+      "content": {
+        "eyebrow": "How it works",
+        "headline": "The Velure <em>Ritual</em>",
+        "steps": [
+          { "n": "01", "title": "Consult", "text": "Book online in under a minute. Your appointment is confirmed instantly, and we prepare a plan before you arrive." },
+          { "n": "02", "title": "Treat", "text": "An unhurried appointment in a private suite, led by our medical team." },
+          { "n": "03", "title": "Aftercare", "text": "Personal reminders, aftercare notes and a follow-up — so results last." }
+        ],
+        "note": "Steps 01 and 03 describe the live automation (instant confirmation, reminders, follow-up). Keep copy aligned with what n8n actually does."
+      }
+    },
+    {
+      "id": "book",
+      "theme": "dark (espresso_deep), data-theme='dark'",
+      "layout": "Desktop: 5/7 split — left image (booking-reception, 3:4, radius lg, subtle parallax), right inline BookingForm (same component as the panel). Mobile: image as 16:9 banner, form below.",
+      "content": {
+        "eyebrow": "Book now",
+        "headline": "Your first visit begins with a <em>conversation.</em>",
+        "text": "Choose a treatment and a time that suits you. We'll confirm by email right away and send a reminder the day before.",
+        "details": [
+          { "label": "Hours", "value": "Mon – Sat · 9:00 – 19:00" },
+          { "label": "Studio", "value": "1200 Desert Bloom Ave, Scottsdale, AZ" },
+          { "label": "Phone", "value": "(480) 555-0142" }
+        ]
+      },
+      "form": "see specs/velure_booking_spec.json"
+    },
+    {
+      "id": "contact",
+      "theme": "light (ivory)",
+      "layout": "Desktop: 2 columns. Left = contact form. Right = newsletter block on sand card + visit details. Mobile: stacked, newsletter first.",
+      "contact_form": {
+        "eyebrow": "Contact",
+        "headline": "Questions, <em>welcome.</em>",
+        "text": "Not sure which treatment is right for you? Send us a note — a member of our team will reply within one business day.",
+        "fields": [
+          { "name": "name", "label": "Full name", "type": "text", "required": true, "max": 80 },
+          { "name": "email", "label": "Email", "type": "email", "required": true },
+          { "name": "phone", "label": "Phone (optional)", "type": "tel", "required": false },
+          { "name": "message", "label": "Message", "type": "textarea", "required": true, "min": 10, "max": 1000 },
+          { "name": "company", "label": "", "type": "honeypot", "hidden": true }
+        ],
+        "submit": "Send message",
+        "success": "Thank you — your message is with us. A confirmation is on its way to your inbox.",
+        "error": "Something went wrong. Please try again, or call us at (480) 555-0142.",
+        "endpoint_env": "NEXT_PUBLIC_N8N_CONTACT_WEBHOOK",
+        "payload": "{ name, email, phone, message, company, source: 'velure-web', submitted_at }"
+      },
+      "newsletter": {
+        "eyebrow": "The Velure Letter",
+        "headline": "Skin notes, <em>occasionally.</em>",
+        "text": "Seasonal treatments, honest skincare advice and first access to new openings. No noise.",
+        "fields": [
+          { "name": "email", "type": "email", "required": true, "placeholder": "Your email" },
+          { "name": "company", "type": "honeypot", "hidden": true }
+        ],
+        "submit": "Subscribe",
+        "success": "You're on the list. Check your inbox for a welcome note.",
+        "duplicate": "You're already subscribed — thank you.",
+        "endpoint_env": "NEXT_PUBLIC_N8N_SUBSCRIBE_WEBHOOK",
+        "payload": "{ email, company, source: 'velure-web', subscribed_at }"
+      }
+    },
+    {
+      "id": "footer",
+      "theme": "dark (espresso_deep)",
+      "content": {
+        "wordmark_large": "Velure — set huge (≈18vw), clipped at the bottom edge, ivory at 92% opacity",
+        "columns": [
+          { "title": "Visit", "lines": ["1200 Desert Bloom Ave", "Scottsdale, AZ"] },
+          { "title": "Hours", "lines": ["Mon – Sat", "9:00 – 19:00"] },
+          { "title": "Contact", "lines": ["(480) 555-0142", "Instagram"] }
+        ],
+        "legal": "© 2026 Velure Med Spa. Velure is a fictional brand created as a demonstration project.",
+        "credit": "Designed & built by Thaus → https://thaus.co"
+      }
+    }
+  ],
+
+  "motion": {
+    "principles": [
+      "Slow in, soft out. Nothing bounces. Default ease 'expo.out' for entrances, 'power3.inOut' for transitions, durations 0.9–1.4s.",
+      "One idea per section. Scroll-scrubbed motion only for the hero exit, philosophy text, menu reveal and ritual line. Everything else plays once on enter.",
+      "Respect prefers-reduced-motion: disable Lenis, all pins and scrubs; show final states; keep only opacity fades ≤ 0.3s.",
+      "Register plugins once in a client-side provider: gsap.registerPlugin(ScrollTrigger, SplitText, useGSAP). Use useGSAP with scope refs and automatic cleanup. Call ScrollTrigger.refresh() after fonts load (document.fonts.ready) and after the hero video metadata loads."
+    ],
+    "smooth_scroll": "Lenis({ lerp: 0.085, wheelMultiplier: 0.9, smoothWheel: true, syncTouch: false }). Drive it from gsap.ticker (lenis.raf(time*1000)), gsap.ticker.lagSmoothing(0), lenis.on('scroll', ScrollTrigger.update). Expose lenis via React context for scrollTo/stop/start.",
+    "preloader": "Timeline: wordmark letters (SplitText chars, mask) yPercent 110→0, stagger 0.05, 0.9s expo.out → sub line fades in 0.4s → hold 0.25s → panel clip-path inset(0 0 0% 0) → inset(0 0 100% 0), 1.0s power4.inOut, while hero video wrapper scales 1.12→1.0 (1.6s expo.out). Then hero text timeline starts.",
+    "hero_intro": "SplitText headline by lines with mask:'lines'; lines yPercent 105→0, stagger 0.12, 1.2s expo.out. Eyebrow and subline fade-up (y 16→0, opacity 0→1) 0.15s after. CTAs fade-up with 0.08 stagger. Nav fades in last (0.6s).",
+    "hero_exit_scrub": "ScrollTrigger on hero, start 'top top', end 'bottom top', scrub 0.6: video wrapper scale 1→1.08 and yPercent 0→12; overlay opacity +0.35; content y 0→-90 and opacity 1→0 (content ends at 60% of the range).",
+    "philosophy_statement": "SplitText words; opacity 0.14→1 with scrub, start 'top 78%', end 'bottom 45%', stagger 0.04. Pillars: hairline scaleX 0→1 (transform-origin left) then text fade-up, once, stagger 0.12.",
+    "menu_reveal": "Pin the stage for end '+=160%', scrub 0.8. Timeline: (0→0.65) image wrapper clip-path from 'inset(32% 36% 32% 36% round 24px)' to 'inset(0% 0% 0% 0% round 0px)'; inner image scale 1.35→1.0 (counter-zoom); (0.35→0.7) dark overlay opacity 0→0.45; (0.55→0.85) headline lines rise (yPercent 100→0) and intro fades in; (0.85→1) hold. Before the reveal, a small eyebrow 'The Menu' sits centered above the window on ivory. On mobile use end '+=110%' and start window 'inset(26% 18% 26% 18% round 18px)'.",
+    "menu_list": "Each row on enter (start 'top 88%', once): hairline scaleX 0→1 (0.9s expo.out) then row content y 28→0, opacity 0→1, stagger 0.08 across rows as they enter. Hover (desktop, pointer:fine only): name x 0→14px, number color taupe→gold, arrow rotates -45°→0. Preview image: one absolutely-positioned element following the pointer with gsap.quickTo (x/y, duration 0.6, ease power3); on row enter swap src (preloaded) and animate clip-path inset(100% 0 0 0)→inset(0 0 0 0) + scale 1.08→1 in 0.6s; on list leave clip back up. Mobile accordion: height auto via gsap (0.5s power3.inOut), image fades in.",
+    "ritual_line": "Horizontal hairline across the three steps, scaleX 0→1 scrubbed from 'top 70%' to 'bottom 60%'. Each step's numeral and text fade-up when the line passes its column (use timeline labels at 0, 0.4, 0.8). Mobile: vertical line, scaleY.",
+    "section_theme_transitions": "Sections declare data-theme='light'|'sand'|'dark'. A single ScrollTrigger per section (start 'top 55%', end 'bottom 55%') tweens CSS variables --bg and --fg on <body> over 0.8s power2.inOut (onEnter/onEnterBack). This produces the smooth ivory → espresso → ivory color transitions as you move through the page. Nav reads the same theme.",
+    "booking_section": "Image parallax yPercent -8→8 scrub. Headline lines mask-reveal once. Form fields fade-up stagger 0.05 once.",
+    "contact_section": "Headline mask-reveal once; form fields fade-up; newsletter card rises y 40→0 with slight delay.",
+    "footer": "Large wordmark: SplitText chars yPercent 100→0, stagger 0.04, 1.2s expo.out when footer top hits 80% viewport. Columns fade-up.",
+    "booking_panel": "shadcn Sheet, side right, width min(560px, 100vw). Overlay espresso_deep/40 + backdrop-blur(6px), fade 0.4s. Panel enters x 100%→0 with cubic-bezier(0.22,1,0.36,1) 0.7s; contents stagger fade-up 0.04 after 0.2s. Lenis stopped while open; focus trapped; ESC and overlay click close.",
+    "micro": "Buttons: fill-wipe (see design_tokens.buttons). Links: underline draw. Inputs: bottom-border style; on focus the gold line draws from left (scaleX). No custom cursor."
+  },
+
+  "accessibility": [
+    "WCAG AA contrast for all body text; gold used for decoration/large numerals only on light backgrounds.",
+    "Every interactive element keyboard reachable; visible focus ring 2px gold offset 3px.",
+    "Video is decorative: aria-hidden, no controls. Provide a pause toggle (small icon button bottom-left of hero) — required for autoplaying motion > 5s.",
+    "SplitText targets keep an aria-label with the full sentence; split children aria-hidden.",
+    "Form errors announced via aria-live='polite'; labels always visible (no placeholder-only fields)."
+  ],
+
+  "performance": [
+    "Lighthouse targets: Performance ≥ 90 mobile, LCP < 2.5s. LCP element is the hero poster image — preload it.",
+    "Video files ≤ 6 MB each (H.264, CRF 26–28, 1920px / 1080px wide, no audio track). Optional WebM VP9 source listed first.",
+    "Treatment images via next/image, quality 80, sizes per layout; preview images preloaded after idle (requestIdleCallback).",
+    "GSAP and Lenis loaded only in client components; no layout shift from SplitText (wait for fonts)."
+  ],
+
+  "seo": {
+    "title": "Velure Med Spa — Radiance, refined. | Scottsdale, AZ",
+    "description": "Velure is a physician-led med spa in Scottsdale offering signature facials, injectables, microneedling, laser and body contouring. Book online in under a minute.",
+    "og_image": "Generate 1200×630 from menu-reveal.png with the wordmark (app/opengraph-image.tsx).",
+    "schema_org": "MedicalBusiness JSON-LD with name, address, openingHours, priceRange '$$$'. Mark as demo in description."
+  },
+
+  "env": {
+    "NEXT_PUBLIC_N8N_BOOKING_WEBHOOK": "https://your-n8n-instance.example.com/webhook/velure-booking",
+    "NEXT_PUBLIC_N8N_CONTACT_WEBHOOK": "https://your-n8n-instance.example.com/webhook/velure-contact",
+    "NEXT_PUBLIC_N8N_SUBSCRIBE_WEBHOOK": "https://your-n8n-instance.example.com/webhook/velure-subscribe",
+    "note": "Same pattern as thaus.co: client-side fetch to n8n webhooks. n8n must allow CORS for http://localhost:3000, the *.vercel.app URL and any custom domain (with AND without www — lesson from the thaus build)."
+  },
+
+  "file_structure_suggestion": [
+    "src/app/layout.tsx — fonts, metadata, <Providers> (Lenis + GSAP + BookingPanel context), grain overlay",
+    "src/app/page.tsx — composes sections in order",
+    "src/components/layout/{Nav,MobileMenu,Footer,Preloader}.tsx",
+    "src/components/sections/{Hero,Philosophy,Treatments,TreatmentList,Ritual,Book,Contact}.tsx",
+    "src/components/forms/{BookingForm,ContactForm,NewsletterForm}.tsx",
+    "src/components/booking/BookingPanel.tsx — Sheet wrapper using BookingForm",
+    "src/components/motion/{SmoothScroll,ThemeObserver,SplitReveal}.tsx",
+    "src/lib/{treatments.ts,booking-schema.ts,contact-schema.ts,submit.ts,slots.ts}",
+    "src/hooks/{useBookingPanel.ts,useReducedMotion.ts}",
+    "public/media/* — assets downloaded by scripts/download-assets.ps1"
+  ]
+}
