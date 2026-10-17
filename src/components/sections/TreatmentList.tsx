@@ -11,19 +11,17 @@ import { treatments } from "@/lib/treatments";
 import { cn } from "@/lib/utils";
 import { useBooking } from "@/components/booking/BookingProvider";
 
-const PREVIEW_W = 320;
-const PREVIEW_H = 400;
+const PREVIEW_W = 260;
+const PREVIEW_H = 325;
 const HIDDEN = "inset(100% 0% 0% 0%)";
 const SHOWN = "inset(0% 0% 0% 0%)";
 
 export function TreatmentList() {
   const ref = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
   const booking = useBooking();
 
   const [desktop, setDesktop] = useState(false);
   const [expanded, setExpanded] = useState<number | null>(null);
-  const [preload, setPreload] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -32,21 +30,6 @@ export function TreatmentList() {
     mq.addEventListener("change", sync);
     return () => mq.removeEventListener("change", sync);
   }, []);
-
-  // Preview images are fetched after idle so they never compete with the LCP.
-  useEffect(() => {
-    if (!desktop) return;
-    const w = window as Window & {
-      requestIdleCallback?: (cb: () => void) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (w.requestIdleCallback) {
-      const id = w.requestIdleCallback(() => setPreload(true));
-      return () => w.cancelIdleCallback?.(id);
-    }
-    const t = window.setTimeout(() => setPreload(true), 1500);
-    return () => window.clearTimeout(t);
-  }, [desktop]);
 
   // Row entrances (once) + cursor-follow preview (desktop, fine pointer only).
   useGSAP(
@@ -86,67 +69,51 @@ export function TreatmentList() {
             });
           }
 
-          if (!fine || reduce) return;
+          // Side preview: a still frame beside the list. Hovering (or focusing) a
+          // row reveals that treatment's photo over the previous one.
+          const frame = root.querySelector<HTMLElement>("[data-preview]");
+          if (!frame || !fine) return;
+          const imgs = gsap.utils.toArray<HTMLElement>("[data-preview-img]", frame);
+          if (!imgs.length) return;
 
-          const preview = previewRef.current;
-          if (!preview) return;
-          const imgs = gsap.utils.toArray<HTMLElement>("[data-preview-img]", preview);
-          const inner = preview.querySelector("[data-preview-inner]");
-
-          gsap.set(preview, { x: 0, y: 0 });
-          const moveX = gsap.quickTo(preview, "x", { duration: 0.6, ease: "power3" });
-          const moveY = gsap.quickTo(preview, "y", { duration: 0.6, ease: "power3" });
-          let visible = false;
-          let current = -1;
-
-          // Event-driven tweens belong to this context so cleanup reverts them.
           const owner = gsap.context(() => {}, root);
-          const show = (index: number) => owner.add(() => {
-            imgs.forEach((el, i) => gsap.set(el, { opacity: i === index ? 1 : 0 }));
-            if (!visible) {
-              visible = true;
-              gsap.fromTo(
-                preview,
-                { clipPath: HIDDEN },
-                { clipPath: SHOWN, duration: 0.6, ease: "power3.out", overwrite: "auto" },
-              );
-              gsap.fromTo(
-                inner,
-                { scale: 1.08 },
-                { scale: 1, duration: 0.6, ease: "power3.out", overwrite: "auto" },
-              );
-            }
-          });
-          const hide = () => owner.add(() => {
-            visible = false;
-            current = -1;
-            gsap.to(preview, { clipPath: HIDDEN, duration: 0.5, ease: "power3.inOut", overwrite: "auto" });
-          });
+          let current = 0;
+          let z = 10;
 
-          const onMove = (e: PointerEvent) => {
-            moveX(e.clientX + 36);
-            moveY(e.clientY - PREVIEW_H / 2);
-            const row = (e.target as HTMLElement).closest<HTMLElement>("[data-row]");
-            if (!row) return;
-            const index = Number(row.dataset.index);
-            if (index !== current) {
-              current = index;
-              show(index);
-            }
+          const show = (index: number) => {
+            if (index === current || !imgs[index]) return;
+            current = index;
+            owner.add(() => {
+              const el = imgs[index];
+              if (reduce) {
+                gsap.set(imgs, { clipPath: HIDDEN });
+                gsap.set(el, { clipPath: SHOWN, zIndex: ++z });
+                return;
+              }
+              const inner = el.querySelector("[data-preview-inner]");
+              gsap.set(el, { zIndex: ++z, clipPath: HIDDEN });
+              gsap.to(el, { clipPath: SHOWN, duration: 0.8, ease: "power3.out" });
+              gsap.fromTo(inner, { scale: 1.1 }, { scale: 1, duration: 1.1, ease: "power3.out" });
+            });
           };
 
-          root.addEventListener("pointermove", onMove);
-          root.addEventListener("pointerleave", hide);
+          const onOver = (e: Event) => {
+            const row = (e.target as HTMLElement).closest<HTMLElement>("[data-row]");
+            if (row) show(Number(row.dataset.index));
+          };
+
+          root.addEventListener("pointerover", onOver);
+          root.addEventListener("focusin", onOver);
           return () => {
-            root.removeEventListener("pointermove", onMove);
-            root.removeEventListener("pointerleave", hide);
+            root.removeEventListener("pointerover", onOver);
+            root.removeEventListener("focusin", onOver);
             owner.revert();
           };
         },
       );
       return () => mm.revert();
     },
-    { scope: ref, dependencies: [preload] },
+    { scope: ref },
   );
 
   // Mobile accordion: animate panel height with GSAP.
@@ -183,7 +150,8 @@ export function TreatmentList() {
 
   return (
     <div ref={ref} className="section-y relative pt-[clamp(4rem,10vh,8rem)]">
-      <div className="wrap">
+      <div className="wrap xl:grid xl:grid-cols-[minmax(0,1fr)_260px] xl:items-start xl:gap-12">
+        <div>
         <ul className="border-b border-stone">
           {treatments.map((t, i) => (
             <li key={t.id} data-row data-index={i} className="relative">
@@ -198,7 +166,7 @@ export function TreatmentList() {
                   onClick={() => onRow(i, t.id)}
                   aria-expanded={desktop ? undefined : expanded === i}
                   aria-controls={desktop ? undefined : `acc-${t.id}`}
-                  className="group grid w-full cursor-pointer grid-cols-[2.5rem_1fr_auto] items-center gap-x-4 py-7 text-left lg:grid-cols-[4rem_minmax(0,1.1fr)_minmax(0,1.4fr)_6rem_9rem_2.5rem] lg:gap-x-8 lg:py-9"
+                  className="group grid w-full cursor-pointer grid-cols-[2.5rem_1fr_auto] items-center gap-x-4 py-7 text-left lg:grid-cols-[4rem_minmax(0,1.1fr)_minmax(0,1.4fr)_6rem_9rem_2.5rem] lg:gap-x-8 lg:py-9 xl:grid-cols-[3rem_minmax(0,1.2fr)_minmax(0,1.4fr)_4.5rem_7rem_2rem] xl:gap-x-5"
                 >
                   <span className="font-display text-base text-ink/70 transition-colors duration-300 group-hover:text-gold">
                     {t.n}
@@ -273,31 +241,38 @@ export function TreatmentList() {
         <p className="mt-8 text-sm text-ink/70">
           Final pricing is confirmed at consultation. Prices in USD.
         </p>
-      </div>
+        </div>
 
-      {/* Cursor-follow preview (desktop, fine pointer) */}
-      <div
-        ref={previewRef}
-        aria-hidden="true"
-        className="pointer-events-none fixed left-0 top-0 z-30 hidden overflow-hidden rounded-md lg:block"
-        style={{ width: PREVIEW_W, height: PREVIEW_H, clipPath: HIDDEN }}
-      >
-        <div data-preview-inner className="absolute inset-0">
-          {preload &&
-            treatments.map((t) => (
-              <div key={t.id} data-preview-img className="absolute inset-0 opacity-0">
-                <Image
-                  src={t.image}
-                  alt=""
-                  fill
-                  sizes={`${PREVIEW_W}px`}
-                  quality={80}
-                  className="object-cover"
-                />
+        {/* Still preview frame beside the list (xl+). Swaps on row hover/focus. */}
+        <aside aria-hidden="true" className="sticky top-[calc(50svh-170px)] hidden xl:block">
+          <div
+            data-preview
+            className="relative overflow-hidden rounded-md bg-sand"
+            style={{ width: PREVIEW_W, height: PREVIEW_H }}
+          >
+            {treatments.map((t, i) => (
+              <div
+                key={t.id}
+                data-preview-img
+                className="absolute inset-0"
+                style={{ clipPath: i === 0 ? SHOWN : HIDDEN, zIndex: i === 0 ? 10 : 0 }}
+              >
+                <div data-preview-inner className="absolute inset-0">
+                  <Image
+                    src={t.image}
+                    alt=""
+                    fill
+                    sizes={`${PREVIEW_W}px`}
+                    quality={80}
+                    className="object-cover"
+                  />
+                </div>
               </div>
             ))}
-        </div>
+          </div>
+        </aside>
       </div>
+
     </div>
   );
 }
