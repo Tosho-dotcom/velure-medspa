@@ -114,13 +114,13 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Huge wordmark, clipped at the bottom edge */}
+      {/* Huge wordmark, shown in full */}
       <div className="wrap" aria-hidden="true">
-        <div className="h-[11vw] overflow-hidden">
+        <div className="overflow-hidden pb-[2vw]">
           <p
             data-footer-word
             data-reveal
-            className="font-display select-none whitespace-nowrap text-center text-[18vw] font-light leading-[0.85] tracking-[-0.04em] text-ink/90"
+            className="font-display select-none whitespace-nowrap text-center text-[18vw] font-light leading-[1] tracking-[-0.04em] text-ink/90"
           >
             Velure
           </p>
