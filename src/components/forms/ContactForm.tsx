@@ -7,6 +7,7 @@ import { Loader2Icon } from "lucide-react";
 
 import { contactSchema, type ContactValues } from "@/lib/contact-schema";
 import { postJSON } from "@/lib/submit";
+import { useFormAge } from "@/hooks/useFormAge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +29,7 @@ function FieldError({ message }: { message?: string }) {
 
 export function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
+  const formAge = useFormAge();
   const {
     register,
     handleSubmit,
@@ -52,6 +54,7 @@ export function ContactForm() {
           company: data.company ?? "",
           source: "velure-web",
           submitted_at: new Date().toISOString(),
+          elapsedMs: formAge(),
         },
         { timeoutMs: 15000 },
       );

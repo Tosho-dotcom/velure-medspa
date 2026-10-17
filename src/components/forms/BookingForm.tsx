@@ -21,6 +21,7 @@ import {
   keyToDate,
 } from "@/lib/slots";
 import { postJSON } from "@/lib/submit";
+import { useFormAge } from "@/hooks/useFormAge";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -136,6 +137,8 @@ export function BookingForm({
     null,
   );
 
+  const formAge = useFormAge();
+
   const rootRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
   const successRef = useRef<HTMLDivElement>(null);
@@ -212,6 +215,7 @@ export function BookingForm({
       treatmentName: getTreatmentName(data.treatmentId),
       source: "velure-web",
       submittedAt: new Date().toISOString(),
+      elapsedMs: formAge(),
       timezone: TIMEZONE,
     };
 

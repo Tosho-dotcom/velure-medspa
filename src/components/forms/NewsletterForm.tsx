@@ -7,6 +7,7 @@ import { Loader2Icon } from "lucide-react";
 
 import { newsletterSchema, type NewsletterValues } from "@/lib/newsletter-schema";
 import { postJSON } from "@/lib/submit";
+import { useFormAge } from "@/hooks/useFormAge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PillButton } from "@/components/ui/pill-button";
@@ -17,6 +18,7 @@ type SubscribeResponse = { ok?: boolean; duplicate?: boolean };
 
 export function NewsletterForm() {
   const [status, setStatus] = useState<Status>("idle");
+  const formAge = useFormAge();
   const {
     register,
     handleSubmit,
@@ -38,6 +40,7 @@ export function NewsletterForm() {
           company: data.company ?? "",
           source: "velure-web",
           subscribed_at: new Date().toISOString(),
+          elapsedMs: formAge(),
         },
         { timeoutMs: 15000 },
       );
