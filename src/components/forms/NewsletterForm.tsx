@@ -44,7 +44,8 @@ export function NewsletterForm() {
         },
         { timeoutMs: 15000 },
       );
-      if (http >= 200 && http < 300) {
+      // Require the explicit ok: a broken workflow can answer 200 with an empty body.
+      if (http >= 200 && http < 300 && res?.ok === true) {
         setStatus(res?.duplicate ? "duplicate" : "success");
         reset();
       } else {

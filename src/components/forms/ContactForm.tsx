@@ -44,7 +44,7 @@ export function ContactForm() {
   async function onSubmit(data: ContactValues) {
     setStatus("loading");
     try {
-      const { status: http } = await postJSON(
+      const { status: http, data: res } = await postJSON<{ ok?: boolean }>(
         process.env.NEXT_PUBLIC_N8N_CONTACT_WEBHOOK,
         {
           name: data.name,
@@ -58,7 +58,8 @@ export function ContactForm() {
         },
         { timeoutMs: 15000 },
       );
-      if (http >= 200 && http < 300) {
+      // Require the explicit ok: a broken workflow can answer 200 with an empty body.
+      if (http >= 200 && http < 300 && res?.ok === true) {
         setStatus("success");
         reset();
       } else {
