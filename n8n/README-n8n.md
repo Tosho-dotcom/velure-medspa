@@ -74,9 +74,39 @@ Return JSON: {"subject": "...", "title": "...", "intro": "...", "points": [{"lea
 
 5. U Code nodeu koji formatira HTML koristi isti "shell" kao u Velure workflowima (Booking → *Build Emails*, prvih ~25 linija). Na dno dodaj unsubscribe link `https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=...` i rečenicu o demo projektu.
 
-## Faza 2 (EP 14–15, kasnije)
+## Faza 2: podsjetnik i review request
 
-Baza *Velure Bookings* već ima polja `Reminder sent` i `Review requested`. Workflowi za podsjetnik dan prije termina i za review request nakon termina dodaju se na istu bazu, bez promjena na webu.
+Dva dodatna workflowa rade nad bazom *Velure Bookings* (polja `Reminder sent` i `Review requested` već postoje). Web se ne mijenja.
+
+| Workflow | Kad radi | Što radi |
+|---|---|---|
+| `velure_reminder_workflow.json` | svaki sat | Dohvati rezervacije sa `Status = Confirmed` i `Reminder sent` isključenim, pa svakome čiji je termin za **1 do 24 sata** pošalje podsjetnik i uključi `Reminder sent`. |
+| `velure_review_workflow.json` | svaki dan u 19:30 (Phoenix) | Dohvati rezervacije sa `Status = Completed` i `Review requested` isključenim, pa svakome pošalje zahtjev za recenziju i uključi `Review requested`. |
+
+Import je isti kao kod ostalih (Workflows → Import from File), zatim odaberi **Notion** i **SMTP** credentiale na Notion i Send Email nodeovima i **Activate**. Oba imaju i **Run now (manual test)** čvor za ručno pokretanje.
+
+### Pravila (da te ne iznenade)
+
+- **Rezervacija napravljena manje od 25 h prije termina ne dobiva podsjetnik.** Takav je klijent maločas dobio potvrdu, pa drugi mail odmah nakon nje bio bi suvišan. Konstanta je `MIN_LEAD_HOURS` u nodu *Prepare Reminders*.
+- **Podsjetnik ne ide za termin bliži od 1 h**, ni za prošle termine.
+- **`Completed` postavljaš ti ručno u Notionu** nakon što klijent dođe (promjenom `Status` u *Completed*). Nema automatskog označavanja, jer bi *No-show* završio kao *Completed* i dobio zahvalu. Nikad ne mijenjaj `Reminder sent` / `Review requested` ručno osim za testiranje.
+- **Review request ide samo za posjete unutar zadnjih 14 dana** (`MAX_AGE_DAYS`), za slučaj da netko označi staru rezervaciju kao *Completed*.
+- Ako slanje maila ne uspije, workflow staje prije nego što uključi kvačicu, pa se pokušava ponovno pri sljedećem pokretanju.
+- **Link za recenziju:** u nodu *Prepare Review Requests* konstanta `REVIEW_URL` trenutno vodi na kontakt sekciju weba. Kad poslovanje dobije pravu stranicu za recenzije (npr. Google), zamijeni je.
+
+### Kako testirati
+
+**Podsjetnik** (zahtijeva zapis čiji je termin unutar 24 h, a takav ne možeš napraviti kroz web jer forma traži datum od sutra):
+1. U nodu *Prepare Reminders* privremeno postavi `const MIN_LEAD_HOURS = 0;` (inače test-rezervacija, kreirana maloprije, bude preskočena).
+2. U Notionu otvori testnu rezervaciju sa `Status = Confirmed` i postavi **Appointment** na sutra unutar 24 h od sada (npr. za 10 sati). `Reminder sent` mora biti isključen.
+3. Otvori workflow i klikni **Execute workflow** (kroz *Run now (manual test)*). Očekuješ mail "Reminder: … on … at …" na email iz rezervacije i uključenu kvačicu `Reminder sent`.
+4. Pokreni ponovno: ništa se ne smije poslati (kvačica je uključena).
+5. Vrati `MIN_LEAD_HOURS = 25`.
+
+**Review request:**
+1. U Notionu postavi testnu rezervaciju na `Status = Completed`, a **Appointment** na jučer ili danas ranije.
+2. Pokreni *Run now (manual test)*. Očekuješ mail "How was your visit, …?" i uključenu kvačicu `Review requested`.
+3. Pokreni ponovno: ništa se ne smije poslati.
 
 ## Brzi test (nakon importa, prije web forme)
 

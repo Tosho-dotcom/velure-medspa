@@ -1,0 +1,217 @@
+{
+  "name": "Velure — Reminder",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "7d18937e-be5b-43eb-8822-7bce99f1b86e",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d6a0da01-f882-4b4a-a137-93e81ee5b373",
+      "name": "Run now (manual test)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_BOOKINGS_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "equals",
+              "selectValue": "Confirmed"
+            },
+            {
+              "key": "Reminder sent|checkbox",
+              "condition": "equals",
+              "checkboxValue": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f6cb5e6-4b05-4399-af4b-3b2566b9676e",
+      "name": "Get Confirmed Bookings",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        300,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure - appointment reminder. Runs hourly; the Notion query already limits to Confirmed + not yet reminded.\n// Shared Velure email shell (inline styles only — email clients ignore <style> blocks)\nconst shell = (title, bodyHtml) => `<!doctype html><html><body style=\"margin:0;padding:0;background:#FAF6F1;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FAF6F1;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#FFFFFF;border:1px solid #EFE6DA;border-radius:14px;\">\n<tr><td style=\"padding:40px 40px 8px 40px;font-family:Georgia,'Times New Roman',serif;font-size:26px;letter-spacing:-0.5px;color:#2B2420;\">Velure</td></tr>\n<tr><td style=\"padding:0 40px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#B08968;\">Med Spa &middot; Scottsdale</td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;\"><div style=\"height:1px;background:#EFE6DA;line-height:1px;\">&nbsp;</div></td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#2B2420;\">${title}</td></tr>\n<tr><td style=\"padding:16px 40px 36px 40px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#4A3F39;\">${bodyHtml}</td></tr>\n</table>\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;\">\n<tr><td style=\"padding:20px 8px;font-family:Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8A7D74;text-align:center;\">\nVelure Med Spa &middot; 1200 Desert Bloom Ave, Scottsdale, AZ &middot; (480) 555-0142<br>\nVelure is a fictional brand created as a demonstration project by <a href=\"https://thaus.co\" style=\"color:#8A7D74;\">Thaus</a>.\n</td></tr></table>\n</td></tr></table></body></html>`;\nconst esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst row = (k, v) => `<tr><td style=\"padding:6px 0;color:#8A7D74;width:120px;vertical-align:top;\">${k}</td><td style=\"padding:6px 0;color:#2B2420;\">${v}</td></tr>`;\n\n// ---- read a Notion page whether \"Simplify\" is on (property_*) or off (properties.*) ----\nconst snake = (n) => 'property_' + n.toLowerCase().replace(/[^a-z0-9]+/g, '_');\nconst raw = (j, name) => (j.properties || {})[name];\nconst text = (v) => (Array.isArray(v) ? v.map((x) => x.plain_text || '').join('') : (v ?? ''));\nconst prop = (j, name) => (j[snake(name)] !== undefined ? j[snake(name)] : raw(j, name));\nconst str = (j, name) => {\n  const v = prop(j, name);\n  if (v == null) return '';\n  if (typeof v === 'string') return v;\n  if (v.email !== undefined) return v.email || '';\n  if (v.select !== undefined) return (v.select && v.select.name) || '';\n  if (v.rich_text !== undefined) return text(v.rich_text);\n  if (v.title !== undefined) return text(v.title);\n  if (v.phone_number !== undefined) return v.phone_number || '';\n  return '';\n};\nconst dateStart = (j, name) => {\n  const v = prop(j, name);\n  if (!v) return '';\n  if (typeof v === 'string') return v;\n  if (v.start) return v.start;\n  if (v.date && v.date.start) return v.date.start;\n  if (v.created_time) return v.created_time;\n  return '';\n};\nconst flag = (j, name) => {\n  const v = prop(j, name);\n  return typeof v === 'object' && v !== null ? !!v.checkbox : !!v;\n};\nconst title = (j) => j.name || str(j, 'Client');\n// Appointments are stored in Phoenix time (UTC-7, no DST). Strings without an offset are Phoenix local.\nconst PHX = 7 * 3600 * 1000;\nconst toMs = (s) => (/[zZ]$|[+-]\\d\\d:\\d\\d$/.test(s) ? Date.parse(s) : Date.parse(s + '-07:00'));\nconst DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];\nconst MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];\nconst labels = (ms) => {\n  const d = new Date(ms - PHX); // read the UTC fields as Phoenix wall time\n  const h = d.getUTCHours(), m = d.getUTCMinutes();\n  return {\n    dateLabel: `${DAYS[d.getUTCDay()]}, ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`,\n    timeLabel: `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`,\n  };\n};\n\n// Remind when the appointment is between 1 and 24 hours away. Bookings made less than\n// MIN_LEAD_HOURS ahead were just confirmed by email, so they get no second message.\nconst MIN_LEAD_HOURS = 25;\nconst now = Date.now();\nconst out = [];\n\nfor (const item of $input.all()) {\n  const j = item.json;\n  const email = str(j, 'Email').trim();\n  const startStr = dateStart(j, 'Appointment');\n  if (!email || !startStr) continue;\n\n  const when = toMs(startStr);\n  if (Number.isNaN(when)) continue;\n  const hoursUntil = (when - now) / 3600000;\n  if (hoursUntil < 1 || hoursUntil > 24) continue;\n\n  const createdStr = dateStart(j, 'Created') || j.created_time || '';\n  const created = createdStr ? Date.parse(createdStr) : NaN;\n  if (!Number.isNaN(created) && (when - created) / 3600000 < MIN_LEAD_HOURS) continue;\n\n  const fullName = title(j) || 'there';\n  const firstName = fullName.split(' ')[0] || 'there';\n  const treatment = str(j, 'Treatment') || 'your appointment';\n  const ref = str(j, 'Booking ID');\n  const firstVisit = flag(j, 'First visit');\n  const { dateLabel, timeLabel } = labels(when);\n\n  const html = shell(\n    `See you soon, ${esc(firstName)}.`,\n    `<p style=\"margin:0 0 18px 0;\">A quiet reminder that your appointment at Velure is coming up.</p>\n     <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;font-size:14px;border-top:1px solid #EFE6DA;border-bottom:1px solid #EFE6DA;margin:8px 0 22px 0;\">\n     ${row('Treatment', esc(treatment))}\n     ${row('Date', esc(dateLabel))}\n     ${row('Time', esc(timeLabel) + ' (Arizona time)')}\n     ${row('Where', '1200 Desert Bloom Ave, Scottsdale, AZ')}\n     ${ref ? row('Reference', esc(ref)) : ''}\n     </table>\n     <p style=\"margin:0 0 12px 0;\">Please arrive ten minutes early${firstVisit ? ' &mdash; as it is your first visit, we will begin with a short consultation' : ''}.</p>\n     <p style=\"margin:0;\">Need to change something? Simply reply to this email or call us at (480) 555-0142.</p>\n     <p style=\"margin:22px 0 0 0;color:#2B2420;\">With care,<br>The Velure team</p>`\n  );\n\n  out.push({ json: {\n    pageId: j.id, email, html,\n    subject: `Reminder: ${treatment} on ${dateLabel} at ${timeLabel}`,\n  } });\n}\n\nreturn out;\n"
+      },
+      "id": "60eccdff-95a7-4354-b2eb-cc604aaf9ca2",
+      "name": "Prepare Reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "Velure Med Spa <owner@example.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "owner@example.com"
+        }
+      },
+      "id": "5d435be4-abbd-4a43-b7b2-addcf2dca0d7",
+      "name": "Send Reminder",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "update",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $('Prepare Reminders').item.json.pageId }}",
+          "mode": "id"
+        },
+        "simple": true,
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Reminder sent|checkbox",
+              "checkboxValue": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4d96290-f186-4a4e-8173-1d7c457f7cac",
+      "name": "Mark Reminder Sent",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "Get Confirmed Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now (manual test)": {
+      "main": [
+        [
+          {
+            "node": "Get Confirmed Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Confirmed Bookings": {
+      "main": [
+        [
+          {
+            "node": "Prepare Reminders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Reminders": {
+      "main": [
+        [
+          {
+            "node": "Send Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Reminder": {
+      "main": [
+        [
+          {
+            "node": "Mark Reminder Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

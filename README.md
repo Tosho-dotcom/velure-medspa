@@ -16,7 +16,9 @@ velure-build-kit/
 │  ├─ velure_booking_workflow.json
 │  ├─ velure_contact_workflow.json
 │  ├─ velure_subscribe_workflow.json
-│  └─ velure_unsubscribe_workflow.json
+│  ├─ velure_unsubscribe_workflow.json
+│  ├─ velure_reminder_workflow.json     faza 2: podsjetnik prije termina
+│  └─ velure_review_workflow.json       faza 2: zahtjev za recenziju
 └─ scripts/
    └─ download-assets.ps1        skida video i slike iz Higgsfielda u public/media
 ```
@@ -54,6 +56,8 @@ Videi su generirani sa start i end frameom na istoj slici, pa bi loop trebao bit
 - [ ] Contact: Notion lead + auto-reply + obavijest tebi.
 - [ ] Newsletter: pretplata → Notion + welcome mail (nakon 2 min); ponovna pretplata → poruka "already subscribed".
 - [ ] Unsubscribe link iz maila radi.
+- [ ] Faza 2: podsjetnik stiže za termin unutar 24 h i uključuje `Reminder sent` (vidi `n8n/README-n8n.md`).
+- [ ] Faza 2: rezervacija sa `Status = Completed` dobiva review mail i uključuje `Review requested`.
 - [ ] Reduced motion (Windows: Settings → Accessibility → Visual effects → Animation effects OFF) → stranica radi bez pinova.
 - [ ] Lighthouse mobile ≥ 90.
 
