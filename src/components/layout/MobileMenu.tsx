@@ -108,7 +108,7 @@ export function MobileMenu({
       aria-label="Menu"
       aria-hidden={!open}
       inert={!open}
-      className="fixed inset-0 [--bg:var(--espresso-deep)] [--fg:var(--ivory-on-dark)] z-[70] flex flex-col bg-espresso-deep px-[var(--gutter)] pb-8 pt-[calc(var(--nav-h)+2rem)] text-ivory-on-dark lg:hidden"
+      className="invisible fixed inset-0 [--bg:var(--espresso-deep)] [--fg:var(--ivory-on-dark)] z-[70] flex flex-col bg-espresso-deep px-[var(--gutter)] pb-8 pt-[calc(var(--nav-h)+2rem)] text-ivory-on-dark lg:hidden"
     >
       <ul className="flex flex-1 flex-col justify-center gap-3">
         {navLinks.map((l) => (
