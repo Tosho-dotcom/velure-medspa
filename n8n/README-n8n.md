@@ -1,6 +1,6 @@
 # Velure — n8n backend
 
-Četiri workflowa spremna za import i jedan koji dupliciraš s thaus.co. Svi pišu u **nove Velure Notion baze** (već kreirane, vidi dolje), odvojene od Thausa.
+Sedam workflowa spremnih za import: četiri za web (booking, contact, subscribe, unsubscribe), dva iz faze 2 (podsjetnik, review request) i tjedni newsletter. Svi pišu u **nove Velure Notion baze** (već kreirane, vidi dolje), odvojene od Thausa.
 
 ## Notion baze (kreirane)
 
@@ -14,7 +14,7 @@ Stranica **Velure Med Spa — CRM** (privatna, u tvom Notion workspaceu):
 
 **Obavezan korak:** u Notionu otvori stranicu *Velure Med Spa — CRM* → `•••` → **Connections** → dodaj istu integraciju koju koristi n8n za Thaus. Bez toga n8n dobiva 404 na sve tri baze.
 
-## Import (za svaki od 4 JSON-a)
+## Import (za svaki JSON)
 
 1. n8n → **Workflows → Import from File** → odaberi JSON.
 2. Na svakom **Notion** nodeu odaberi postojeći Notion credential.
@@ -46,33 +46,27 @@ Webhook → validacija → traži email u *Velure Newsletter*. Ako postoji, post
 **Velure — Unsubscribe**
 GET link iz maila → postavlja Status na Unsubscribed i upisuje datum → prikazuje malu Velure HTML potvrdu. Nepoznata adresa također dobiva poruku o uspjehu, da se ne otkriva tko je na listi.
 
-## Velure — Weekly Letter (dupliciraj thaus workflow)
+## Velure — Weekly Letter (tjedni newsletter)
 
-Struktura je ista kao Thaus tjedni AI newsletter: Schedule → Claude → format → Notion pretplatnici → slanje. Najbrže je duplicirati postojeći workflow:
+`velure_weekly_letter_workflow.json`. Svaki **četvrtak u 08:00 (Phoenix)** Claude napiše kratko pismo "The Velure Letter" i pošalje ga svim pretplatnicima sa `Status = Active`.
 
-1. Thaus weekly newsletter → `•••` → **Duplicate** → preimenuj u *Velure — Weekly Letter*.
-2. Schedule: npr. četvrtak 08:00, timezone `America/Phoenix`.
-3. Notion "get subscribers": baza `NOTION_NEWSLETTER_DB_ID`, filter `Status = Active`. Napomena: Velure baza ima `Date subscribed` bez razmaka na kraju (Thaus baza ima razmak u nazivu tog polja).
-4. U Claude nodeu zamijeni system prompt ovim:
+**Tijek:** raspored → *Pick Topic* → *Write Letter (Claude)* → *Build Letter* → *Get Active Subscribers* → *Build Emails* → *Send Letter*.
 
-```
-You write "The Velure Letter", a short weekly email from Velure Med Spa (Scottsdale, Arizona).
-Voice: calm, precise, warm, never salesy, no exclamation marks, no emojis. Clinical credibility with a soft hand.
-Pick ONE topic at random from this list and write about it (do not mention that it was chosen at random):
-- seasonal skin in the Arizona desert (dryness, sun, hydration)
-- how a facial differs from a medical-grade treatment
-- what to expect at a first consultation
-- daily SPF habits that actually stick
-- collagen: what it is and what helps it
-- aftercare basics after microneedling or laser
-- myths about injectables and natural results
-- building a simple evening routine
-Rules: 180–260 words. Structure: a title (max 8 words), one short intro paragraph, three short points each with a bold lead-in, one closing line inviting readers to book a consultation at Velure.
-Never give individual medical advice; recommend a consultation for personal questions. Do not invent prices, discounts or statistics.
-Return JSON: {"subject": "...", "title": "...", "intro": "...", "points": [{"lead": "...", "text": "..."}], "closing": "..."}
-```
+- **Tema** se bira po tjednu u godini (8 tema u rotaciji, bez ponavljanja uzastopno), a ne nasumično. Lista je u nodu *Pick Topic*.
+- **Claude** se zove izravno preko API-ja (`claude-sonnet-5-5`, ~1500 izlaznih tokena, oko 1 cent po pismu). System prompt (glas marke, 180 do 260 riječi, bez izmišljenih cijena i tvrdnji, bez individualnih medicinskih savjeta) je u nodu *Pick Topic* i lako se mijenja.
+- **Provjera izlaza u kodu** (*Build Letter*): pismo mora imati naslov, uvod, točno tri točke s naslovom i zaključak, između 120 i 330 riječi. Uskličnici i emoji se uklanjaju. Ako išta ne valja, workflow **pukne i ne šalje ništa** (vidi Executions), pa pretplatnici nikad ne dobiju neispravno pismo.
+- **Unsubscribe link** u svakom pismu je potpisan istim tajnim ključem kao u *Subscribe* i *Unsubscribe* workflowu.
+- Ako slanje jednom primatelju ne uspije, ostali ipak dobiju pismo.
 
-5. U Code nodeu koji formatira HTML koristi isti "shell" kao u Velure workflowima (Booking → *Build Emails*, prvih ~25 linija). Na dno dodaj unsubscribe link `https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=...` i rečenicu o demo projektu.
+### Podešavanje (jednom)
+1. **Anthropic ključ:** u n8n-u napravi credential **Header Auth** s imenom headera `x-api-key` i vrijednošću svog API ključa (console.anthropic.com), nazovi ga npr. *Anthropic API key* i odaberi ga na nodu *Write Letter (Claude)*.
+2. **Tajni ključ:** u nodu *Build Emails* zamijeni `REPLACE_WITH_A_LONG_RANDOM_SECRET` **istom** vrijednošću kao u *Build Welcome* (Subscribe) i *Prepare* (Unsubscribe). Ako se razlikuje, linkovi za odjavu u pismima neće raditi.
+3. Odaberi **Notion** i **SMTP** credentiale i **Activate**.
+
+### Test (prije prvog pravog slanja)
+Klikni **Execute workflow** kroz *Run now (sends a preview to you only)*. Taj put **šalje pismo samo tebi** (predmet počinje s "[Preview]"), nikad pretplatnicima. Pročitaj ga, klikni Unsubscribe (odjavit će te, pa se po potrebi ponovno pretplati) i tek onda ostavi raspored aktivnim. Zakazano pokretanje u četvrtak šalje svim aktivnim pretplatnicima.
+
+> Gmail SMTP dopušta oko 500 mailova dnevno, što je dovoljno za početak. Za veću listu treba pravi servis za slanje (npr. Resend ili Brevo).
 
 ## Faza 2: podsjetnik i review request
 

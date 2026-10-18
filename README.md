@@ -18,7 +18,8 @@ velure-build-kit/
 │  ├─ velure_subscribe_workflow.json
 │  ├─ velure_unsubscribe_workflow.json
 │  ├─ velure_reminder_workflow.json     faza 2: podsjetnik prije termina
-│  └─ velure_review_workflow.json       faza 2: zahtjev za recenziju
+│  ├─ velure_review_workflow.json       faza 2: zahtjev za recenziju
+│  └─ velure_weekly_letter_workflow.json  tjedni newsletter (Claude)
 └─ scripts/
    └─ download-assets.ps1        skida video i slike iz Higgsfielda u public/media
 ```

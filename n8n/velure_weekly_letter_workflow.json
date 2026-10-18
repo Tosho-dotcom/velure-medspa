@@ -1,0 +1,319 @@
+{
+  "name": "Velure — Weekly Letter",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 4"
+            }
+          ]
+        }
+      },
+      "id": "bc6ef7b3-f5ca-4fa1-9dd4-496a86ca05d1",
+      "name": "Thursday 08:00 (Phoenix)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "9e3dceff-1422-4883-9d20-fc4f654e1fd8",
+      "name": "Run now (sends a preview to you only)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { previewOnly: false } }];"
+      },
+      "id": "042e4e08-12af-43ab-bac0-410fa1a27900",
+      "name": "Mode: live",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { previewOnly: true } }];"
+      },
+      "id": "8d57f1b7-9eed-41e8-a7a7-95179d2a62da",
+      "name": "Mode: preview",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure - choose this week's topic and build the prompt.\n// Topics rotate by ISO week so the same one never repeats back to back.\nconst TOPICS = [\n  'seasonal skin in the Arizona desert (dryness, sun, hydration)',\n  'how a facial differs from a medical-grade treatment',\n  'what to expect at a first consultation',\n  'daily SPF habits that actually stick',\n  'collagen: what it is and what helps it',\n  'aftercare basics after microneedling or laser',\n  'myths about injectables and natural results',\n  'building a simple evening routine',\n];\nconst previewOnly = !!($input.first().json || {}).previewOnly;\n\n// ISO week number (Phoenix wall time, UTC-7)\nconst d = new Date(Date.now() - 7 * 3600 * 1000);\nconst t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));\nconst dayNum = t.getUTCDay() || 7;\nt.setUTCDate(t.getUTCDate() + 4 - dayNum);\nconst yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));\nconst week = Math.ceil(((t - yearStart) / 86400000 + 1) / 7);\nconst topic = TOPICS[week % TOPICS.length];\n\nconst system = \"You write \\\"The Velure Letter\\\", a short weekly email from Velure Med Spa (Scottsdale, Arizona).\\nVoice: calm, precise, warm, never salesy, no exclamation marks, no emojis. Clinical credibility with a soft hand.\\nWrite about the single topic you are given. Do not mention that it was assigned.\\nRules: 180-260 words in total. Structure: a title (max 8 words), one short intro paragraph, three short points each with a bold lead-in (a few words), and one closing line inviting readers to book a consultation at Velure.\\nNever give individual medical advice; recommend a consultation for personal questions. Do not invent prices, discounts, statistics or clinical claims you cannot stand behind. Do not name products or brands.\\nReturn ONLY a JSON object, with no code fences and no commentary: {\\\"subject\\\": \\\"...\\\", \\\"title\\\": \\\"...\\\", \\\"intro\\\": \\\"...\\\", \\\"points\\\": [{\\\"lead\\\": \\\"...\\\", \\\"text\\\": \\\"...\\\"}, {\\\"lead\\\": \\\"...\\\", \\\"text\\\": \\\"...\\\"}, {\\\"lead\\\": \\\"...\\\", \\\"text\\\": \\\"...\\\"}], \\\"closing\\\": \\\"...\\\"}\";\nconst userPrompt = `Write this week's letter. Topic: ${topic}. Return only the JSON object.`;\nreturn [{ json: { previewOnly, week, topic, system, userPrompt } }];\n"
+      },
+      "id": "cb5fa273-f907-467e-88a9-c11c388d7843",
+      "name": "Pick Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 1500, system: $json.system, messages: [{ role: 'user', content: $json.userPrompt }] }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "b28f2e26-9470-4e03-b173-4a8fc72c0ee8",
+      "name": "Write Letter (Claude)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        280
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure - validate Claude's JSON and build the letter HTML.\n// Shared Velure email shell (inline styles only — email clients ignore <style> blocks)\nconst shell = (title, bodyHtml) => `<!doctype html><html><body style=\"margin:0;padding:0;background:#FAF6F1;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FAF6F1;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#FFFFFF;border:1px solid #EFE6DA;border-radius:14px;\">\n<tr><td style=\"padding:40px 40px 8px 40px;font-family:Georgia,'Times New Roman',serif;font-size:26px;letter-spacing:-0.5px;color:#2B2420;\">Velure</td></tr>\n<tr><td style=\"padding:0 40px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#B08968;\">Med Spa &middot; Scottsdale</td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;\"><div style=\"height:1px;background:#EFE6DA;line-height:1px;\">&nbsp;</div></td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#2B2420;\">${title}</td></tr>\n<tr><td style=\"padding:16px 40px 36px 40px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#4A3F39;\">${bodyHtml}</td></tr>\n</table>\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;\">\n<tr><td style=\"padding:20px 8px;font-family:Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8A7D74;text-align:center;\">\nVelure Med Spa &middot; 1200 Desert Bloom Ave, Scottsdale, AZ &middot; (480) 555-0142<br>\nVelure is a fictional brand created as a demonstration project by <a href=\"https://thaus.co\" style=\"color:#8A7D74;\">Thaus</a>.\n</td></tr></table>\n</td></tr></table></body></html>`;\nconst esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst row = (k, v) => `<tr><td style=\"padding:6px 0;color:#8A7D74;width:120px;vertical-align:top;\">${k}</td><td style=\"padding:6px 0;color:#2B2420;\">${v}</td></tr>`;\n\nconst reply = $input.first().json;\nconst raw = (reply.content || []).map((c) => c.text || '').join('').trim();\nif (!raw) throw new Error('Claude returned no text: ' + JSON.stringify(reply).slice(0, 300));\n\n// Tolerate code fences or a stray sentence around the JSON.\nconst start = raw.indexOf('{'), end = raw.lastIndexOf('}');\nif (start < 0 || end < start) throw new Error('No JSON object in Claude reply: ' + raw.slice(0, 200));\nlet letter;\ntry { letter = JSON.parse(raw.slice(start, end + 1)); }\ncatch (e) { throw new Error('Claude JSON did not parse: ' + e.message); }\n\n// Voice rules enforced in code, not just in the prompt.\nconst clean = (v) => String(v ?? '')\n  .replace(/!/g, '.')\n  .replace(/[\\u{1F000}-\\u{1FFFF}\\u{2600}-\\u{27BF}\\u{FE0F}]/gu, '')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst subject = clean(letter.subject);\nconst title = clean(letter.title);\nconst intro = clean(letter.intro);\nconst closing = clean(letter.closing);\nconst points = Array.isArray(letter.points) ? letter.points.map((p) => ({ lead: clean(p && p.lead), text: clean(p && p.text) })) : [];\n\nif (!subject || !title || !intro || !closing) throw new Error('Letter is missing subject, title, intro or closing.');\nif (points.length !== 3 || points.some((p) => !p.lead || !p.text)) throw new Error('Letter must have exactly 3 points with lead and text.');\n\nconst words = [title, intro, closing, ...points.map((p) => p.lead + ' ' + p.text)].join(' ').split(/\\s+/).length;\nif (words < 120 || words > 330) throw new Error(`Letter length looks wrong (${words} words); not sending.`);\n\nconst pointsHtml = points.map((p) =>\n  `<p style=\"margin:0 0 14px 0;\"><strong style=\"color:#2B2420;\">${esc(p.lead)}.</strong> ${esc(p.text)}</p>`).join('');\n\nconst html = shell(\n  esc(title),\n  `<p style=\"margin:0 0 20px 0;\">${esc(intro)}</p>\n   ${pointsHtml}\n   <p style=\"margin:22px 0 24px 0;\">${esc(closing)}</p>\n   <p style=\"margin:0 0 28px 0;\"><a href=\"https://velure-medspa.vercel.app/#book\" style=\"display:inline-block;padding:14px 28px;background:#2B2420;color:#FAF6F1;border-radius:999px;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:14px;\">Book a consultation</a></p>\n   <p style=\"margin:0;color:#2B2420;\">With care,<br>The Velure team</p>\n   <p style=\"margin:28px 0 0 0;font-size:12px;color:#8A7D74;\">You are receiving this because you subscribed to The Velure Letter on our website. <a href=\"%%UNSUB%%\" style=\"color:#8A7D74;\">Unsubscribe</a> at any time. This letter is general information, not personal medical advice.</p>`\n);\n\nreturn [{ json: { subject, html, words } }];\n"
+      },
+      "id": "96c08351-7cb9-4629-88aa-158dbf565b7f",
+      "name": "Build Letter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_NEWSLETTER_DB_ID",
+          "mode": "id"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status|select",
+              "condition": "equals",
+              "selectValue": "Active"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3e9caf67-0a75-4517-9b94-11ec7967089f",
+      "name": "Get Active Subscribers",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1380,
+        280
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure - one email per active subscriber (or just the owner in preview mode).\n\n// IMPORTANT: use the SAME secret as in the Subscribe and Unsubscribe workflows,\n// otherwise the unsubscribe link in the letter will be rejected.\nconst UNSUB_SECRET = 'REPLACE_WITH_A_LONG_RANDOM_SECRET';\nconst OWNER = 'owner@example.com';\n// Pure-JS HMAC-SHA256 (no require): n8n's Code node blocks built-in modules by default.\nconst hmacHex = (key, msg) => {\n  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];\n  const utf8 = (s) => Array.from(unescape(encodeURIComponent(s)), (c) => c.charCodeAt(0));\n  const sha = (bytes) => {\n    const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];\n    const l = bytes.length, m = bytes.concat([0x80]);\n    while (m.length % 64 !== 56) m.push(0);\n    const bits = l * 8;\n    for (let i = 7; i >= 0; i--) m.push(i > 3 ? 0 : (bits >>> (i * 8)) & 255);\n    const rr = (x, n) => (x >>> n) | (x << (32 - n));\n    for (let o = 0; o < m.length; o += 64) {\n      const w = [];\n      for (let i = 0; i < 16; i++) w[i] = (m[o+i*4] << 24) | (m[o+i*4+1] << 16) | (m[o+i*4+2] << 8) | m[o+i*4+3];\n      for (let i = 16; i < 64; i++) {\n        const s0 = rr(w[i-15],7) ^ rr(w[i-15],18) ^ (w[i-15] >>> 3);\n        const s1 = rr(w[i-2],17) ^ rr(w[i-2],19) ^ (w[i-2] >>> 10);\n        w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;\n      }\n      let [a,b,c,d,e,f,g,h] = H;\n      for (let i = 0; i < 64; i++) {\n        const t1 = (h + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;\n        const t2 = ((rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;\n        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;\n      }\n      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0;\n      H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;\n    }\n    return H.flatMap((x) => [x >>> 24, (x >>> 16) & 255, (x >>> 8) & 255, x & 255]);\n  };\n  let k = utf8(key);\n  if (k.length > 64) k = sha(k);\n  while (k.length < 64) k.push(0);\n  const inner = sha(k.map((x) => x ^ 0x36).concat(utf8(msg)));\n  const out = sha(k.map((x) => x ^ 0x5c).concat(inner));\n  return out.map((x) => x.toString(16).padStart(2, '0')).join('');\n};\n\nconst { subject, html } = $('Build Letter').first().json;\nconst previewOnly = !!$('Pick Topic').first().json.previewOnly;\n\nconst seen = new Set();\nlet recipients = [];\nif (previewOnly) {\n  recipients = [OWNER];\n} else {\n  for (const item of $input.all()) {\n    const j = item.json || {};\n    const e = String(j.property_email || (j.properties && j.properties.Email && j.properties.Email.email) || '').trim().toLowerCase();\n    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(e) || seen.has(e)) continue;\n    seen.add(e);\n    recipients.push(e);\n  }\n}\n\nreturn recipients.map((email) => {\n  const token = hmacHex(UNSUB_SECRET, email).slice(0, 32);\n  const link = `https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=${encodeURIComponent(email)}&token=${token}`;\n  return { json: { email, subject: previewOnly ? `[Preview] ${subject}` : subject, html: html.replace('%%UNSUB%%', link) } };\n});\n"
+      },
+      "id": "16817d23-edfa-4e08-8751-5638a9951615",
+      "name": "Build Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "Velure Med Spa <owner@example.com>",
+        "toEmail": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "owner@example.com"
+        }
+      },
+      "id": "dd0a1305-84b1-49d9-b1a6-059cc3ce2d1f",
+      "name": "Send Letter",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1940,
+        280
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Thursday 08:00 (Phoenix)": {
+      "main": [
+        [
+          {
+            "node": "Mode: live",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now (sends a preview to you only)": {
+      "main": [
+        [
+          {
+            "node": "Mode: preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mode: live": {
+      "main": [
+        [
+          {
+            "node": "Pick Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mode: preview": {
+      "main": [
+        [
+          {
+            "node": "Pick Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick Topic": {
+      "main": [
+        [
+          {
+            "node": "Write Letter (Claude)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Letter (Claude)": {
+      "main": [
+        [
+          {
+            "node": "Build Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Letter": {
+      "main": [
+        [
+          {
+            "node": "Get Active Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Build Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Emails": {
+      "main": [
+        [
+          {
+            "node": "Send Letter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}
