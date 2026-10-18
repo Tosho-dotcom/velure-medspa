@@ -28,7 +28,11 @@ const title = "Velure Med Spa — Radiance, refined. | Scottsdale, AZ";
 const description =
   "Velure is a physician-led med spa in Scottsdale offering signature facials, injectables, microneedling, laser and body contouring. Book online in under a minute.";
 
+// Absolute base for the Open Graph image. Set NEXT_PUBLIC_SITE_URL once the real domain exists.
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://velure-medspa.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title,
   description,
   openGraph: {
@@ -49,7 +53,7 @@ export const viewport: Viewport = {
  * Runs before first paint: marks JS availability (so content stays visible
  * without it) and decides whether the once-per-session preloader shows.
  */
-const bootScript = `(function(){var d=document.documentElement;d.classList.add('js');try{var r=window.matchMedia('(prefers-reduced-motion: reduce)').matches;if(!r&&!sessionStorage.getItem('velure_intro'))d.classList.add('intro')}catch(e){}})();`;
+const bootScript = `(function(){var d=document.documentElement;d.classList.add('js');try{var r=window.matchMedia('(prefers-reduced-motion: reduce)').matches;var i=!r&&!sessionStorage.getItem('velure_intro');if(i)d.classList.add('intro');d.style.setProperty('--hero-delay',i?'0.9s':'0.1s')}catch(e){}})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
