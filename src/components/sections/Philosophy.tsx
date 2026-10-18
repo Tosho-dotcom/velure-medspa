@@ -67,7 +67,7 @@ export function Philosophy() {
 
           // Statement: word-by-word scrub from 14% to full opacity.
           return afterFontsIn(root, () => {
-              const split = SplitText.create(statement, { type: "words" });
+              const split = SplitText.create(statement, { type: "words", aria: "none" });
               gsap.set(statement, { autoAlpha: 1 });
               gsap.fromTo(
                 split.words,

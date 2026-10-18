@@ -131,9 +131,9 @@ export function Nav() {
               setMenuOpen(false);
               scrollTo(0);
             }}
-            aria-label="Velure Med Spa — back to top"
           >
             <Wordmark />
+            <span className="sr-only">, back to top</span>
           </a>
 
           <ul className="hidden items-center gap-10 lg:flex">

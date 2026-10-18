@@ -64,15 +64,15 @@ export function Preloader() {
             tl.fromTo(
               split.chars,
               { yPercent: 110 },
-              { yPercent: 0, duration: 0.9, ease: "expo.out", stagger: 0.05 },
+              { yPercent: 0, duration: 0.6, ease: "expo.out", stagger: 0.035 },
             )
-              .to(sub, { autoAlpha: 1, duration: 0.4 }, "-=0.35")
-              .to({}, { duration: 0.25 })
+              .to(sub, { autoAlpha: 1, duration: 0.3 }, "-=0.3")
+              .to({}, { duration: 0.1 })
               .add(() => introGate.open())
               .fromTo(
                 panel,
                 { clipPath: "inset(0 0 0% 0)" },
-                { clipPath: "inset(0 0 100% 0)", duration: 1.0, ease: "power4.inOut" },
+                { clipPath: "inset(0 0 100% 0)", duration: 0.7, ease: "power4.inOut" },
               );
           };
 

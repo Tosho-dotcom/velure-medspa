@@ -1,12 +1,19 @@
 "use client";
 
 import { useRef } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 
 import { SplitReveal } from "@/components/motion/SplitReveal";
-import { BookingForm } from "@/components/forms/BookingForm";
+import { LazyMount } from "@/components/motion/LazyMount";
+
+// Calendar, zod and react-hook-form stay out of the initial bundle.
+const BookingForm = dynamic(
+  () => import("@/components/forms/BookingForm").then((m) => m.BookingForm),
+  { ssr: false },
+);
 
 const details = [
   { label: "Hours", value: "Mon – Sat · 9:00 – 19:00" },
@@ -120,7 +127,10 @@ export function Book() {
           </div>
 
           <div data-book-fade data-reveal className="lg:col-span-7">
-            <BookingForm variant="inline" />
+            {/* min-heights match the rendered form so nothing shifts when it mounts */}
+            <LazyMount className="min-h-[1552px] sm:min-h-[1192px]">
+              <BookingForm variant="inline" />
+            </LazyMount>
           </div>
         </div>
       </div>

@@ -3,12 +3,16 @@
 import {
   createContext,
   useCallback,
+  useEffect,
   useContext,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { BookingPanel } from "@/components/booking/BookingPanel";
+import dynamic from "next/dynamic";
+
+const loadPanel = () => import("@/components/booking/BookingPanel").then((m) => m.BookingPanel);
+const BookingPanel = dynamic(loadPanel, { ssr: false });
 
 type BookingApi = {
   /** Open the booking panel, optionally with a treatment preselected. */
@@ -29,9 +33,21 @@ export function useBooking(): BookingApi {
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [treatmentId, setTreatmentId] = useState<string | undefined>();
+  // The panel code is only mounted after the first open.
+  const [wasOpened, setWasOpened] = useState(false);
+
+  // Warm the chunk once the browser is idle so the first open feels instant.
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void) => number };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(() => void loadPanel()) : window.setTimeout(() => void loadPanel(), 3000);
+    return () => {
+      if (!w.requestIdleCallback) window.clearTimeout(id);
+    };
+  }, []);
 
   const open = useCallback((id?: string) => {
     setTreatmentId(id);
+    setWasOpened(true);
     setIsOpen(true);
   }, []);
   const close = useCallback(() => setIsOpen(false), []);
@@ -41,7 +57,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
   return (
     <BookingContext.Provider value={api}>
       {children}
-      <BookingPanel open={isOpen} treatmentId={treatmentId} onOpenChange={setIsOpen} />
+      {wasOpened && (
+        <BookingPanel open={isOpen} treatmentId={treatmentId} onOpenChange={setIsOpen} />
+      )}
     </BookingContext.Provider>
   );
 }

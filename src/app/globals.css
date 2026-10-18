@@ -298,11 +298,28 @@ html.lenis body {
     opacity: 0;
     visibility: hidden;
   }
+  /* Hero text enters via CSS so it never waits for JS (LCP). The delay matches the
+     preloader wipe; boot script in layout.tsx sets --hero-delay. */
+  html.js .hero-in {
+    animation: hero-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--hero-delay, 0.1s) + 0.15s + var(--i, 0) * 0.08s);
+  }
   html.js [data-hairline] {
     transform: scaleX(0);
   }
   html.js [data-hairline-y] {
     transform: scaleY(0);
+  }
+}
+
+@keyframes hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
