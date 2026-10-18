@@ -1,122 +1,158 @@
 # Velure — n8n backend
 
-Sedam workflowa spremnih za import: četiri za web (booking, contact, subscribe, unsubscribe), dva iz faze 2 (podsjetnik, review request) i tjedni newsletter. Svi pišu u **nove Velure Notion baze** (već kreirane, vidi dolje), odvojene od Thausa.
+Seven importable workflows: four for the website (booking, contact, subscribe, unsubscribe),
+two scheduled follow-ups (reminder, review request) and a weekly newsletter. All of them read
+and write a dedicated Notion CRM.
 
-## Notion baze (kreirane)
+> The JSON files contain placeholders only. Replace `REPLACE_ME` credential IDs, the
+> `REPLACE_WITH_A_LONG_RANDOM_SECRET` secret, the `NOTION_*_DB_ID` database IDs, the
+> `owner@example.com` address and the `your-n8n-instance.example.com` domain with your own values
+> inside n8n. Never commit real values.
 
-Stranica **Velure Med Spa — CRM** (privatna, u tvom Notion workspaceu):
+## Notion databases
 
-| Baza | Database ID | Puni je workflow |
+A private Notion page, *Velure Med Spa — CRM*, holds three databases:
+
+| Database | ID placeholder | Used by |
 |---|---|---|
-| Velure Bookings | `NOTION_BOOKINGS_DB_ID` | Velure — Booking |
-| Velure Leads | `NOTION_LEADS_DB_ID` | Velure — Contact |
-| Velure Newsletter | `NOTION_NEWSLETTER_DB_ID` | Velure — Subscribe / Unsubscribe / Weekly Letter |
+| Velure Bookings | `NOTION_BOOKINGS_DB_ID` | Booking, Reminder, Review request |
+| Velure Leads | `NOTION_LEADS_DB_ID` | Contact |
+| Velure Newsletter | `NOTION_NEWSLETTER_DB_ID` | Subscribe, Unsubscribe, Weekly letter |
 
-**Obavezan korak:** u Notionu otvori stranicu *Velure Med Spa — CRM* → `•••` → **Connections** → dodaj istu integraciju koju koristi n8n za Thaus. Bez toga n8n dobiva 404 na sve tri baze.
+**Required:** open the CRM page in Notion → `•••` → **Connections** → add the integration your
+n8n instance uses. Without it, every Notion call returns 404.
 
-## Import (za svaki JSON)
+## Import (for each JSON file)
 
-1. n8n → **Workflows → Import from File** → odaberi JSON.
-2. Na svakom **Notion** nodeu odaberi postojeći Notion credential.
-3. Na svakom **Send Email** nodeu odaberi postojeći Gmail SMTP credential.
-4. Otvori svaki Notion node jednom: n8n ponovno učita listu propertyja. Provjeri da su polja mapirana (posebno `Appointment` datum s vremenom, timezone `America/Phoenix`).
-5. Provjeri **Webhook → Options → Allowed Origins**. Upisano je `http://localhost:3000,https://velure-medspa.vercel.app`. Nakon deploya zamijeni drugu adresu stvarnim Vercel URL-om. Ako dodaš vlastitu domenu, upiši je i s `www` i bez njega (lekcija s thaus.co).
-6. **Tajni ključ za unsubscribe (obavezno, 1 minuta).** U workflowu *Velure — Subscribe* otvori node **Build Welcome**, a u *Velure — Unsubscribe* node **Prepare**. Na vrhu oba koda je `const UNSUB_SECRET = 'REPLACE_WITH_A_LONG_RANDOM_SECRET';`. Zamijeni tekst **istom** dugom nasumičnom vrijednošću u oba noda (npr. 40+ znakova iz password managera). Bez toga linkovi rade, ali svatko tko pročita repo može krivotvoriti token.
-7. **Origin zaštita.** Kod noda *Validate…* u booking, contact i subscribe workflowu prima samo zahtjeve s `http://localhost:3000` i `https://velure-medspa*.vercel.app`. Kad dobiješ vlastitu domenu, dodaj je u `ORIGIN_OK` regex u ta tri noda (uz Allowed Origins na webhooku).
-8. **Activate** workflow.
+1. n8n → **Workflows → Import from File** → choose the JSON file.
+2. On every **Notion** node, select your Notion credential.
+3. On every **Send Email** node, select your SMTP credential.
+4. Open each Notion node once so n8n reloads the property list, and check the mappings
+   (especially `Appointment`, a date with time in the `America/Phoenix` timezone).
+5. Check **Webhook → Options → Allowed Origins**: `http://localhost:3000` and the production
+   site URL. When adding a custom domain, add it both with and without `www`.
+6. **Unsubscribe secret (required).** In *Velure — Subscribe* (node **Build Welcome**),
+   *Velure — Unsubscribe* (node **Prepare**) and *Velure — Weekly Letter* (node **Build Emails**),
+   replace `REPLACE_WITH_A_LONG_RANDOM_SECRET` with the **same** long random value (40+ characters
+   from a password manager). With the placeholder left in place, anyone who reads this repository
+   could forge unsubscribe tokens.
+7. **Origin check.** The *Validate…* nodes in booking, contact and subscribe accept only requests
+   from `http://localhost:3000` and `https://velure-medspa*.vercel.app`. Add a custom domain to the
+   `ORIGIN_OK` regex in those three nodes, as well as to Allowed Origins on the webhook.
+8. **Activate** the workflow.
 
-Adrese (production webhook URL-ovi, upisani i u `.env.local`):
+Production webhook endpoints (also used in `.env.local`):
 
 - `POST https://your-n8n-instance.example.com/webhook/velure-booking`
 - `POST https://your-n8n-instance.example.com/webhook/velure-contact`
 - `POST https://your-n8n-instance.example.com/webhook/velure-subscribe`
-- `GET  https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=...`
+- `GET  https://your-n8n-instance.example.com/webhook/velure-unsubscribe?email=...&token=...`
 
-## Što koji workflow radi
+## What each workflow does
 
 **Velure — Booking**
-Webhook → validacija i normalizacija (honeypot, Phoenix vrijeme, nedjelja zatvoreno, slotovi 09:00–18:00) → provjera slota u Notionu (`Slot key` + `Status = Confirmed`). Ako je slot zauzet, vraća **409**. Inače kreira zapis u *Velure Bookings*, vraća **200** s `bookingId`, pa šalje dva maila: potvrdu klijentu (Velure stil) i obavijest tebi.
+Webhook → validate and normalise (honeypot, Phoenix time, closed on Sundays, 09:00–18:00 slots)
+→ check the slot in Notion (`Slot key` + `Status = Confirmed`). A taken slot returns **409**.
+Otherwise it creates the booking, returns **200** with `bookingId`, then emails a confirmation
+to the client and a notification to the owner.
 
 **Velure — Contact**
-Webhook → validacija → zapis u *Velure Leads* (Status New) → **200** → obavijest tebi (reply-to = klijent) → auto-reply klijentu (welcome/potvrda primitka).
+Webhook → validate → create a lead (Status *New*) → **200** → notify the owner (reply-to set to
+the client) → auto-reply to the client.
 
 **Velure — Subscribe**
-Webhook → validacija → traži email u *Velure Newsletter*. Ako postoji, postavlja Status na Active i vraća `duplicate: true`. Ako ne postoji, kreira pretplatnika → **200** → čeka 2 min → welcome mail s unsubscribe linkom.
+Webhook → validate → look up the email. An existing address is set back to *Active* and the
+response says `duplicate: true`. A new address is created → **200** → wait 2 minutes → welcome
+email with a signed unsubscribe link.
 
 **Velure — Unsubscribe**
-GET link iz maila → postavlja Status na Unsubscribed i upisuje datum → prikazuje malu Velure HTML potvrdu. Nepoznata adresa također dobiva poruku o uspjehu, da se ne otkriva tko je na listi.
+GET link from an email → verify the token → set Status to *Unsubscribed* with the date → show a
+small branded HTML confirmation. Unknown addresses get the same success message, so the
+workflow never reveals who is on the list.
 
-## Velure — Weekly Letter (tjedni newsletter)
+## Velure — Weekly Letter
 
-`velure_weekly_letter_workflow.json`. Svaki **četvrtak u 08:00 (Phoenix)** Claude napiše kratko pismo "The Velure Letter" i pošalje ga svim pretplatnicima sa `Status = Active`.
+Every **Thursday at 08:00 (Phoenix)** Claude writes a short letter, "The Velure Letter", and it
+is sent to every subscriber with `Status = Active`.
 
-**Tijek:** raspored → *Pick Topic* → *Write Letter (Claude)* → *Build Letter* → *Get Active Subscribers* → *Build Emails* → *Send Letter*.
+**Flow:** schedule → *Pick Topic* → *Write Letter (Claude)* → *Build Letter* →
+*Get Active Subscribers* → *Build Emails* → *Send Letter*.
 
-- **Tema** se bira po tjednu u godini (8 tema u rotaciji, bez ponavljanja uzastopno), a ne nasumično. Lista je u nodu *Pick Topic*.
-- **Claude** se zove izravno preko API-ja (`claude-sonnet-5-5`, ~1500 izlaznih tokena, oko 1 cent po pismu). System prompt (glas marke, 180 do 260 riječi, bez izmišljenih cijena i tvrdnji, bez individualnih medicinskih savjeta) je u nodu *Pick Topic* i lako se mijenja.
-- **Provjera izlaza u kodu** (*Build Letter*): pismo mora imati naslov, uvod, točno tri točke s naslovom i zaključak, između 120 i 330 riječi. Uskličnici i emoji se uklanjaju. Ako išta ne valja, workflow **pukne i ne šalje ništa** (vidi Executions), pa pretplatnici nikad ne dobiju neispravno pismo.
-- **Unsubscribe link** u svakom pismu je potpisan istim tajnim ključem kao u *Subscribe* i *Unsubscribe* workflowu.
-- Ako slanje jednom primatelju ne uspije, ostali ipak dobiju pismo.
+- **Topic** is chosen by week of the year from eight topics in rotation, never the same twice
+  in a row. The list lives in *Pick Topic*.
+- **Claude** is called directly through the Anthropic API (about 1,500 output tokens, roughly
+  one cent per letter). The system prompt — brand voice, 180–260 words, no invented prices or
+  claims, no individual medical advice — sits in *Pick Topic* and is easy to edit.
+- **Output validation in code** (*Build Letter*): the letter must have a title, an intro,
+  exactly three headed points and a close, between 120 and 330 words. Exclamation marks and
+  emoji are stripped. If anything is wrong, the workflow **fails and sends nothing** (see
+  Executions), so subscribers never receive a broken letter.
+- **Every unsubscribe link** is signed with the same secret as Subscribe and Unsubscribe.
+- If sending to one recipient fails, the others still receive the letter.
 
-### Podešavanje (jednom)
-1. **Anthropic ključ:** u n8n-u napravi credential **Header Auth** s imenom headera `x-api-key` i vrijednošću svog API ključa (console.anthropic.com), nazovi ga npr. *Anthropic API key* i odaberi ga na nodu *Write Letter (Claude)*.
-2. **Tajni ključ:** u nodu *Build Emails* zamijeni `REPLACE_WITH_A_LONG_RANDOM_SECRET` **istom** vrijednošću kao u *Build Welcome* (Subscribe) i *Prepare* (Unsubscribe). Ako se razlikuje, linkovi za odjavu u pismima neće raditi.
-3. Odaberi **Notion** i **SMTP** credentiale i **Activate**.
+### One-time setup
+1. **Anthropic key:** create a **Header Auth** credential with header name `x-api-key` and your
+   API key as the value, and select it on *Write Letter (Claude)*.
+2. **Secret:** set the same value as in Subscribe and Unsubscribe in *Build Emails*.
+3. Select the **Notion** and **SMTP** credentials and **Activate**.
 
-### Test (prije prvog pravog slanja)
-Klikni **Execute workflow** kroz *Run now (sends a preview to you only)*. Taj put **šalje pismo samo tebi** (predmet počinje s "[Preview]"), nikad pretplatnicima. Pročitaj ga, klikni Unsubscribe (odjavit će te, pa se po potrebi ponovno pretplati) i tek onda ostavi raspored aktivnim. Zakazano pokretanje u četvrtak šalje svim aktivnim pretplatnicima.
+### Test before the first real send
+Run **Execute workflow** through *Run now (sends a preview to you only)*. That path sends the
+letter **only to the owner** (subject starts with "[Preview]"), never to subscribers. Read it,
+test the unsubscribe link, then leave the schedule active.
 
-> Gmail SMTP dopušta oko 500 mailova dnevno, što je dovoljno za početak. Za veću listu treba pravi servis za slanje (npr. Resend ili Brevo).
+> Gmail SMTP allows roughly 500 emails per day. A larger list needs a dedicated sending service.
 
-## Faza 2: podsjetnik i review request
+## Follow-ups: reminder and review request
 
-Dva dodatna workflowa rade nad bazom *Velure Bookings* (polja `Reminder sent` i `Review requested` već postoje). Web se ne mijenja.
+Both run against *Velure Bookings* (fields `Reminder sent` and `Review requested`). The website
+does not change.
 
-| Workflow | Kad radi | Što radi |
+| Workflow | Runs | What it does |
 |---|---|---|
-| `velure_reminder_workflow.json` | svaki sat | Dohvati rezervacije sa `Status = Confirmed` i `Reminder sent` isključenim, pa svakome čiji je termin za **1 do 24 sata** pošalje podsjetnik i uključi `Reminder sent`. |
-| `velure_review_workflow.json` | svaki dan u 19:30 (Phoenix) | Dohvati rezervacije sa `Status = Completed` i `Review requested` isključenim, pa svakome pošalje zahtjev za recenziju i uključi `Review requested`. |
+| `velure_reminder_workflow.json` | hourly | Finds `Status = Confirmed` bookings without a reminder, sends one to every appointment **1–24 hours** away and sets `Reminder sent`. |
+| `velure_review_workflow.json` | daily at 19:30 (Phoenix) | Finds `Status = Completed` bookings without a review request, sends one and sets `Review requested`. |
 
-Import je isti kao kod ostalih (Workflows → Import from File), zatim odaberi **Notion** i **SMTP** credentiale na Notion i Send Email nodeovima i **Activate**. Oba imaju i **Run now (manual test)** čvor za ručno pokretanje.
+### Rules
 
-### Pravila (da te ne iznenade)
+- **Bookings made less than 25 hours ahead get no reminder.** The client has just received the
+  confirmation; a second email straight after it is noise. Constant: `MIN_LEAD_HOURS` in
+  *Prepare Reminders*.
+- **No reminder** for appointments less than an hour away or in the past.
+- **`Completed` is set manually in Notion** after the visit. It is deliberately not automated,
+  otherwise a no-show would be marked *Completed* and receive a thank-you email.
+- **Review requests only go out for visits in the last 14 days** (`MAX_AGE_DAYS`).
+- If an email fails, the workflow stops **before** setting the flag, so the next run retries.
+- **Review link:** `REVIEW_URL` in *Prepare Review Requests* points to the contact section until
+  the business has a real review page.
 
-- **Rezervacija napravljena manje od 25 h prije termina ne dobiva podsjetnik.** Takav je klijent maločas dobio potvrdu, pa drugi mail odmah nakon nje bio bi suvišan. Konstanta je `MIN_LEAD_HOURS` u nodu *Prepare Reminders*.
-- **Podsjetnik ne ide za termin bliži od 1 h**, ni za prošle termine.
-- **`Completed` postavljaš ti ručno u Notionu** nakon što klijent dođe (promjenom `Status` u *Completed*). Nema automatskog označavanja, jer bi *No-show* završio kao *Completed* i dobio zahvalu. Nikad ne mijenjaj `Reminder sent` / `Review requested` ručno osim za testiranje.
-- **Review request ide samo za posjete unutar zadnjih 14 dana** (`MAX_AGE_DAYS`), za slučaj da netko označi staru rezervaciju kao *Completed*.
-- Ako slanje maila ne uspije, workflow staje prije nego što uključi kvačicu, pa se pokušava ponovno pri sljedećem pokretanju.
-- **Link za recenziju:** u nodu *Prepare Review Requests* konstanta `REVIEW_URL` trenutno vodi na kontakt sekciju weba. Kad poslovanje dobije pravu stranicu za recenzije (npr. Google), zamijeni je.
+### Testing
 
-### Kako testirati
+**Reminder:** temporarily set `MIN_LEAD_HOURS = 0`, set a test booking (`Status = Confirmed`,
+`Reminder sent` off) to an appointment within the next 24 hours, run *Run now (manual test)* and
+expect the reminder email plus the flag. Run again: nothing must be sent. Restore
+`MIN_LEAD_HOURS = 25`.
 
-**Podsjetnik** (zahtijeva zapis čiji je termin unutar 24 h, a takav ne možeš napraviti kroz web jer forma traži datum od sutra):
-1. U nodu *Prepare Reminders* privremeno postavi `const MIN_LEAD_HOURS = 0;` (inače test-rezervacija, kreirana maloprije, bude preskočena).
-2. U Notionu otvori testnu rezervaciju sa `Status = Confirmed` i postavi **Appointment** na sutra unutar 24 h od sada (npr. za 10 sati). `Reminder sent` mora biti isključen.
-3. Otvori workflow i klikni **Execute workflow** (kroz *Run now (manual test)*). Očekuješ mail "Reminder: … on … at …" na email iz rezervacije i uključenu kvačicu `Reminder sent`.
-4. Pokreni ponovno: ništa se ne smije poslati (kvačica je uključena).
-5. Vrati `MIN_LEAD_HOURS = 25`.
+**Review request:** set a test booking to `Status = Completed` with yesterday's date, run the
+manual trigger and expect the email plus the flag. Run again: nothing must be sent.
 
-**Review request:**
-1. U Notionu postavi testnu rezervaciju na `Status = Completed`, a **Appointment** na jučer ili danas ranije.
-2. Pokreni *Run now (manual test)*. Očekuješ mail "How was your visit, …?" i uključenu kvačicu `Review requested`.
-3. Pokreni ponovno: ništa se ne smije poslati.
+## Quick test (after import, before the web form)
 
-## Brzi test (nakon importa, prije web forme)
-
-Webhookovi sada odbacuju (tiho, s `200 ok`, bez zapisa) zahtjeve bez `Origin` headera i bez `elapsedMs` (vrijeme otvorenosti forme u ms, minimalno 2500 za booking i contact, 1000 za subscribe). Test zato mora oboje poslati.
-
-PowerShell:
+The webhooks silently drop (with `200 ok` and no record) any request without an `Origin`
+header or without `elapsedMs` (how long the form was open, in ms; at least 2,500 for booking
+and contact, 1,000 for subscribe). A test therefore has to send both.
 
 ```powershell
-$body = @{ treatmentId="signature-glow-facial"; date="2026-10-22"; time="10:30"; firstName="Test"; lastName="Client"; email="TVOJ_EMAIL"; phone="+1 480 555 0100"; firstVisit=$true; notes=""; consent=$true; company=""; elapsedMs=5000 } | ConvertTo-Json
+$body = @{ treatmentId="signature-glow-facial"; date="2026-10-22"; time="10:30"; firstName="Test"; lastName="Client"; email="you@example.com"; phone="+1 480 555 0100"; firstVisit=$true; notes=""; consent=$true; company=""; elapsedMs=5000 } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri "https://your-n8n-instance.example.com/webhook/velure-booking" -ContentType "application/json" -Headers @{ Origin = "http://localhost:3000" } -Body $body
 ```
 
-Očekuješ `ok: True` i `bookingId`, novi red u Notionu i dva maila. Ponovi isti poziv: drugi put mora vratiti **409** (slot zauzet; PowerShell to prikazuje kao grešku). Datum mora biti od sutra do +60 dana i ne smije biti nedjelja.
+Expect `ok: True` with a `bookingId`, a new Notion record and two emails. Repeat the same call:
+it must return **409** (slot taken). The date must be between tomorrow and +60 days and not a
+Sunday.
 
-Provjera zaštite: isti poziv **bez** `-Headers` (ili s `elapsedMs=100`) mora vratiti `ok: True` **bez** `bookingId` i **ne smije** napraviti zapis u Notionu.
+Protection check: the same call **without** the Origin header (or with `elapsedMs=100`) must
+return `ok: True` **without** a `bookingId` and must not create a record.
 
-Unsubscribe: link iz welcome maila ima `&token=…`. Isti link s izmijenjenim emailom ili tokenom mora prikazati "Link not recognised".
-
-> Napomena: Origin i elapsedMs su "speed bumps" protiv naivnih botova, ne prava zaštita (napadač ih može lažirati). Za pravu zaštitu dodaj Cloudflare Turnstile ili stavi n8n iza WAF-a s rate limitom.
+Unsubscribe: the link in the welcome email carries `&token=…`. The same link with a changed
+email or token must show "Link not recognised".

@@ -1,5 +1,5 @@
 # Velure — download generated media into public/media
-# Pokretanje (iz root foldera projekta, u VS Code terminalu):
+# Run from the project root (e.g. in the VS Code terminal):
 #   powershell -ExecutionPolicy Bypass -File .\scripts\download-assets.ps1
 
 $ErrorActionPreference = "Stop"
@@ -24,7 +24,7 @@ $assets = [ordered]@{
 
 foreach ($name in $assets.Keys) {
   $out = Join-Path $dest $name
-  if (Test-Path $out) { Write-Host "skip  $name (vec postoji)"; continue }
+  if (Test-Path $out) { Write-Host "skip  $name (already exists)"; continue }
   Write-Host "get   $name"
   Invoke-WebRequest -Uri "$base/$($assets[$name])" -OutFile $out -UseBasicParsing
 }

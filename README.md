@@ -1,74 +1,97 @@
-# Velure Med Spa — build kit (Thaus Project #001)
+# Velure Med Spa — booking site with an n8n backend
 
-Sve što treba za izradu stranice lokalno u VS Code-u preko Claude Codea, plus backend za n8n.
+A production-style reference build for an appointment-based service business: a single-page
+Next.js site with a live booking panel, a contact form and a newsletter, backed entirely by
+**seven n8n workflows** and a Notion CRM.
 
-## Sadržaj paketa
+**Live demo:** https://velure-medspa.vercel.app
+
+> Velure is a fictional brand created as a demo project by Thaus. The site accepts real
+> submissions, so the footer, the booking consent and every email state that it is a demo.
+
+## What it does
+
+| Flow | Trigger | What happens |
+|---|---|---|
+| **Booking** | Webhook (POST) | Validate and normalise → bot checks → slot-conflict check in Notion → **409** if taken, otherwise create the booking, return **200** with `bookingId`, email the client and the owner |
+| **Contact** | Webhook (POST) | Validate → create lead in Notion (Status *New*) → notify owner (reply-to = client) → auto-reply to client |
+| **Subscribe** | Webhook (POST) | Validate → find subscriber → reactivate (duplicate) or create → **200** → wait 2 min → welcome email with signed unsubscribe link |
+| **Unsubscribe** | Webhook (GET) | Verify HMAC token → mark *Unsubscribed* with date → branded HTML confirmation (unknown addresses get the same message, so the list is never revealed) |
+| **Reminder** | Every hour | Confirmed bookings 1–24 h ahead without a reminder → send reminder → set `Reminder sent` |
+| **Review request** | Daily 19:30 | Bookings marked *Completed* in the last 14 days → send review request → set `Review requested` |
+| **Weekly letter** | Thursday 08:00 | Rotating topic → Claude writes the letter → output validated in code → sent to active subscribers |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Site["Next.js site (Vercel)"]
+    B[Booking panel] & C[Contact form] & N[Newsletter form]
+  end
+  B -->|POST| WB[n8n: Booking]
+  C -->|POST| WC[n8n: Contact]
+  N -->|POST| WS[n8n: Subscribe]
+  WB & WC & WS --> DB[(Notion CRM:<br/>Bookings · Leads · Newsletter)]
+  SCH[Schedules] --> WR[Reminder] & WV[Review request] & WL[Weekly letter]
+  WR & WV & WL --> DB
+  WL --> AI[Claude API]
+  WB & WC & WS & WR & WV & WL --> M[Email]
+```
+
+## Engineering decisions
+
+- **Spec-first.** `specs/velure_site_spec.json` and `specs/velure_booking_spec.json` are the
+  single source of truth: brand, copy, motion, form rules and the request/response contract
+  between the front end and the workflows. The front end never guesses the API.
+- **No double bookings without a database server.** Every booking carries a `Slot key`; the
+  workflow checks it against confirmed bookings before insert and returns **409**, which the
+  UI turns into "That time was just taken".
+- **Retry-safe schedules.** Reminder and review flags are set only *after* the email is sent,
+  so a failed send is retried on the next run instead of being silently skipped.
+- **Human in the loop where it matters.** *Completed* is set manually in Notion. Automating it
+  would send thank-you emails to no-shows.
+- **LLM output fails closed.** The weekly letter must have a title, an intro, exactly three
+  headed points and a close, within 120–330 words; otherwise the run stops and nothing is
+  sent. A manual trigger sends a preview to the owner only.
+- **Layered bot defence.** Honeypot field, form-timing check (`elapsedMs`), origin allow-list
+  on the webhook and an origin regex in the validate nodes.
+- **Signed unsubscribe links.** HMAC token per address, so nobody can unsubscribe someone else.
+- **Notion as the database.** The owner can read and correct every record by hand.
+
+## Stack
+
+Next.js (App Router) · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui · GSAP (ScrollTrigger,
+SplitText) · Lenis · react-hook-form + zod · n8n (self-hosted) · Notion · Claude API · Vercel.
+
+## Repository layout
 
 ```
-velure-build-kit/
-├─ CLAUDE.md                     pravila projekta koja Claude Code čita automatski
-├─ CLAUDE_CODE_PROMPT.md         promptovi po fazama (0–7), lijepiš jedan po jedan
-├─ specs/
-│  ├─ velure_site_spec.json      brend, tokeni, sekcije, copy, animacije, a11y, SEO
-│  └─ velure_booking_spec.json   booking panel: polja, pravila, stanja, API ugovor
-├─ n8n/
-│  ├─ README-n8n.md              import, Notion baze, weekly letter prompt, test
-│  ├─ velure_booking_workflow.json
-│  ├─ velure_contact_workflow.json
-│  ├─ velure_subscribe_workflow.json
-│  ├─ velure_unsubscribe_workflow.json
-│  ├─ velure_reminder_workflow.json     faza 2: podsjetnik prije termina
-│  ├─ velure_review_workflow.json       faza 2: zahtjev za recenziju
-│  └─ velure_weekly_letter_workflow.json  tjedni newsletter (Claude)
-└─ scripts/
-   └─ download-assets.ps1        skida video i slike iz Higgsfielda u public/media
+specs/      site and booking specifications (source of truth)
+n8n/        the seven workflows (importable JSON) and backend setup guide
+src/        Next.js app: sections, booking panel, forms, motion
+scripts/    helper to download the generated media into public/media
+CLAUDE.md   project rules used during AI-assisted development
 ```
 
-## Redoslijed rada
+## Running it
 
-1. **Raspakiraj** sadržaj `velure-build-kit` izravno u svoj lokalni projektni folder, tako da su `CLAUDE.md` i `specs/` u rootu.
-2. **Mediji:** u VS Code terminalu (u rootu foldera) pokreni:
-   `powershell -ExecutionPolicy Bypass -File .\scripts\download-assets.ps1`
-   Skripta skida 2 videa i 10 slika u `public\media`.
-3. **n8n:** prati `n8n/README-n8n.md`. Najprije spoji Notion stranicu *Velure Med Spa — CRM* s n8n integracijom, zatim importaj 4 workflowa, odaberi credentiale i aktiviraj ih. Booking testiraj PowerShell naredbom iz tog dokumenta. Napomena: drugi, namjerno ponovljeni poziv PowerShell prikazuje kao grešku 409, što je očekivano ponašanje.
-4. **Claude Code:** otvori folder u VS Code-u, pokreni Claude Code i zalijepi **Phase 0** iz `CLAUDE_CODE_PROMPT.md`. Nakon svake faze provjeri `npm run dev`, pa nastavi sa sljedećom.
-5. **Deploy:** Phase 7 (GitHub → Vercel). Nakon deploya upiši stvarni Vercel URL u Allowed Origins sva četiri webhooka.
+```bash
+npm install
+cp .env.local.example .env.local   # point the three webhook URLs at your n8n instance
+npm run dev
+```
 
-## Mediji (Higgsfield, generirano za Velure)
+Backend setup (Notion databases, credentials, secrets, tests) is described in
+[`n8n/README-n8n.md`](n8n/README-n8n.md).
 
-| Datoteka | Namjena |
-|---|---|
-| hero-desktop.mp4 / hero-mobile.mp4 | Hero loop, 10 s, 1080p, bez zvuka (16:9 i 9:16) |
-| hero-*-poster.webp | Poster i LCP slika za hero |
-| menu-reveal.webp | Panel koji se otvara u sekciji The Menu |
-| treatment-01 … 06 | Hover/accordion slike tretmana |
-| booking-reception.webp | Slika uz booking sekciju |
+Workflow JSON files contain placeholders only (`REPLACE_ME`, `REPLACE_WITH_A_LONG_RANDOM_SECRET`,
+`NOTION_*_DB_ID`, `owner@example.com`). Real credentials live in n8n's encrypted credential
+store and in Vercel environment variables, never in this repository.
 
-Videi su generirani sa start i end frameom na istoj slici, pa bi loop trebao biti bez reza. Prije ugradnje ga ipak pogledaj u petlji. Ako je datoteka veća od ~6 MB, komprimiraj je ffmpeg naredbom s dna skripte (ili HandBrakeom).
+## Quality checklist
 
-## End-to-end checklist (nakon deploya)
-
-- [ ] Hero video se učitava (desktop 16:9, mobitel 9:16), poster se vidi odmah.
-- [ ] Preloader se prikazuje samo pri prvom posjetu u sesiji.
-- [ ] The Menu: panel se otvara glatko, bez skoka na početku i kraju pina.
-- [ ] Klik na tretman otvara panel s tim tretmanom već odabranim.
-- [ ] Booking: uspjeh → Notion red + mail klijentu + mail tebi.
-- [ ] Booking istog slota drugi put → poruka "That time was just taken".
-- [ ] Contact: Notion lead + auto-reply + obavijest tebi.
-- [ ] Newsletter: pretplata → Notion + welcome mail (nakon 2 min); ponovna pretplata → poruka "already subscribed".
-- [ ] Unsubscribe link iz maila radi.
-- [ ] Faza 2: podsjetnik stiže za termin unutar 24 h i uključuje `Reminder sent` (vidi `n8n/README-n8n.md`).
-- [ ] Faza 2: rezervacija sa `Status = Completed` dobiva review mail i uključuje `Review requested`.
-- [ ] Reduced motion (Windows: Settings → Accessibility → Visual effects → Animation effects OFF) → stranica radi bez pinova.
-- [ ] Lighthouse mobile ≥ 90.
-
-## Napomena o brendu
-
-Velure je fiktivni brend, a stranica prima stvarne unose. Zato footer, consent u booking formi i svi mailovi navode da je riječ o demo projektu studija Thaus. To štiti tebe i posjetitelje, a u portfoliju djeluje profesionalno.
-
-## Deploy (Vercel)
-
-- Live: https://velure-medspa.vercel.app (Vercel project `velure-medspa`, GitHub repo `Tosho-dotcom/velure-medspa`, deploys on every push to `main`).
-- Env vars (Production and Preview): `NEXT_PUBLIC_N8N_BOOKING_WEBHOOK`, `NEXT_PUBLIC_N8N_CONTACT_WEBHOOK`, `NEXT_PUBLIC_N8N_SUBSCRIBE_WEBHOOK`. Optional: `NEXT_PUBLIC_SITE_URL` once a custom domain exists.
-- n8n webhooks already allow this origin (Allowed Origins plus the `ORIGIN_OK` check in the validate nodes). When a custom domain is added, update both, with and without `www`.
-- `vercel link` writes `.vercel/` and a `VERCEL_OIDC_TOKEN` into `.env.local`; both are git-ignored.
+- Booking success → Notion record + client email + owner email; same slot again → 409 message.
+- Contact → Notion lead + auto-reply + owner notification.
+- Newsletter → Notion + welcome email after 2 min; repeat sign-up → "already subscribed".
+- Unsubscribe link works; a tampered link shows "Link not recognised".
+- Reduced-motion mode works without scroll pinning; Lighthouse mobile ≥ 90.

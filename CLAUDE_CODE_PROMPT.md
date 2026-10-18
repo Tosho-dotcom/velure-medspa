@@ -1,6 +1,6 @@
 # Claude Code — build prompts (paste one phase at a time)
 
-Run these in order from the project root in VS Code. Each phase ends with a commit. Wait until a phase builds cleanly before pasting the next one. (Bilješka: svaka faza = dobar kadar za snimanje epizode.)
+Run these in order from the project root in VS Code. Each phase ends with a commit. Wait until a phase builds cleanly before pasting the next one. Each phase is also a natural checkpoint for documenting the build.
 
 ---
 
