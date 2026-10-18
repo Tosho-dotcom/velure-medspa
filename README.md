@@ -60,3 +60,10 @@ Videi su generirani sa start i end frameom na istoj slici, pa bi loop trebao bit
 ## Napomena o brendu
 
 Velure je fiktivni brend, a stranica prima stvarne unose. Zato footer, consent u booking formi i svi mailovi navode da je riječ o demo projektu studija Thaus. To štiti tebe i posjetitelje, a u portfoliju djeluje profesionalno.
+
+## Deploy (Vercel)
+
+- Live: https://velure-medspa.vercel.app (Vercel project `velure-medspa`, GitHub repo `Tosho-dotcom/velure-medspa`, deploys on every push to `main`).
+- Env vars (Production and Preview): `NEXT_PUBLIC_N8N_BOOKING_WEBHOOK`, `NEXT_PUBLIC_N8N_CONTACT_WEBHOOK`, `NEXT_PUBLIC_N8N_SUBSCRIBE_WEBHOOK`. Optional: `NEXT_PUBLIC_SITE_URL` once a custom domain exists.
+- n8n webhooks already allow this origin (Allowed Origins plus the `ORIGIN_OK` check in the validate nodes). When a custom domain is added, update both, with and without `www`.
+- `vercel link` writes `.vercel/` and a `VERCEL_OIDC_TOKEN` into `.env.local`; both are git-ignored.
