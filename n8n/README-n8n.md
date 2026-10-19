@@ -175,7 +175,7 @@ Under *Velure Med Spa — CRM* there is a page **Velure AI Assistant** with:
 | Item | ID placeholder | Notes |
 |---|---|---|
 | Knowledge Base (page) | `NOTION_KB_PAGE_ID` | Facts only. Callouts are ignored. Booking ids must match `src/lib/treatments.ts`. |
-| System Prompt (page) | `NOTION_PROMPT_PAGE_ID` | Only the code block is used. Keep `{{KNOWLEDGE_BASE}}`; no other curly braces. |
+| System Prompt (page) | `NOTION_PROMPT_PAGE_ID` | Only the code block is used. Keep `{{KNOWLEDGE_BASE}}`; no other curly braces. Reference copy: `velure_chat_system_prompt.txt`. |
 | Velure Chat Logs (database) | `NOTION_CHAT_LOGS_DB_ID` | One row per reply: message, reply, action, tools, session. |
 
 *Velure Leads* has an extra `Source` option, **Chat assistant**. Because the page sits inside the
@@ -184,15 +184,18 @@ CRM page, the existing n8n Notion connection already covers it.
 ### Import order
 1. Import **Availability**, **Booking Link** and **Contact Request** first (the chat workflow
    calls them). Select the Notion credential (and SMTP in Contact Request), replace the `NOTION_*`
-   IDs and `owner@example.com`, then **save** each one. Sub-workflows do not need to be active.
-2. Activate **Velure — Availability** (its webhook serves the booking form).
+   IDs and `owner@example.com`, then save and **publish (activate) each one**. A sub-workflow that
+   is not published fails with "Workflow is not active and cannot be executed".
+2. Check that **Velure — Availability** answers on its webhook (it also serves the booking form).
 3. Create a **Header Auth** credential *Velure Chat Secret*: name `X-Velure-Secret`, value a long
    random string (40+ characters). The same value goes into Vercel as `N8N_CHAT_SECRET`.
 4. Import **Velure Chat Assistant**: select *Velure Chat Secret* on the webhook, the Notion and
    Anthropic credentials, replace the `NOTION_*` IDs, and on the three tool nodes
    (`check_availability`, `suggest_booking`, `save_contact_request`) pick the matching workflow in
-   the dropdown. Keep the tool node names unchanged; the System Prompt refers to them.
-5. Activate it.
+   the dropdown. Switch the field to **By ID** once to confirm a real workflow ID is set. Keep the
+   tool node names unchanged; the System Prompt refers to them.
+5. Save and publish it. **After any later change, publish again**: the live webhook runs the
+   published version, not the saved draft.
 
 ### Vercel environment variables
 `N8N_CHAT_WEBHOOK_URL`, `N8N_CHAT_SECRET`, `NEXT_PUBLIC_N8N_AVAILABILITY_WEBHOOK`, and optionally
@@ -211,6 +214,15 @@ built into the page.
   10-minute cache, so "this Friday" resolves correctly.
 - **Limits:** 400 messages per day in total and 40 per conversation in n8n, plus per-IP and
   per-session limits in `/api/chat` when Upstash is configured.
+
+### Troubleshooting
+| Symptom | Cause | Fix |
+|---|---|---|
+| Site shows "The assistant is unavailable right now" for every message | The chat workflow failed before replying, most often *Build System Prompt*: the System Prompt page has no code block | Put the whole prompt inside ONE Notion code block (type `/code`), not as plain paragraphs |
+| Assistant says it cannot check times or show a Book button | A tool call fails | Open the execution, click the tool node: "Workflow is not active" means the sub-workflow is not published or the tool node has no workflow selected |
+| "Sorry, I could not put an answer together" | Empty agent output | Fixed in *Format Reply* (reads content blocks); make sure the published version has it |
+| Assistant keeps "correcting" earlier answers | Old replies in the conversation memory | Test in a new browser tab (new session) |
+| Prompt edits in Notion do not show | 10-minute cache | Wait, or deactivate and reactivate the workflow |
 
 ### Quick test
 ```powershell

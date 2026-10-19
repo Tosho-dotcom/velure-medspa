@@ -29,7 +29,7 @@
 
   "frontend": {
     "files": {
-      "src/app/api/chat/route.ts": "Origin check (localhost:3000, https://velure-medspa*.vercel.app, NEXT_PUBLIC_SITE_URL, CHAT_ALLOWED_ORIGINS), Upstash limits 10/min/IP, 60/day/IP, 30/day/session (fail open), 30 s upstream timeout.",
+      "src/app/api/chat/route.ts": "Origin check (localhost:3000, https://velure-medspa*.vercel.app, NEXT_PUBLIC_SITE_URL, CHAT_ALLOWED_ORIGINS), Upstash limits 10/min/IP, 60/day/IP, 30/day/session (fail open), 55 s upstream timeout, maxDuration 60.",
       "src/components/chat/ChatWidget.tsx": "Launcher + panel. Mounted in layout.tsx inside BookingProvider.",
       "src/lib/chat.ts": "Types, parseBookingAction, bookingActionLabel.",
       "src/lib/availability.ts": "fetchTakenTimes(date) → string[] | null (8 s timeout).",

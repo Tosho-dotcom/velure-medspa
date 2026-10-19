@@ -10,7 +10,10 @@ import { CHAT_MAX_LENGTH, SESSION_ID_RE, parseBookingAction } from "@/lib/chat";
  * X-Velure-Secret header. The reply is passed back as { reply, action? }.
  */
 
-const UPSTREAM_TIMEOUT_MS = 30_000;
+// A reply can need two tool calls (availability + booking link) and three model calls.
+const UPSTREAM_TIMEOUT_MS = 55_000;
+// Let the platform run this route long enough for UPSTREAM_TIMEOUT_MS.
+export const maxDuration = 60;
 
 const MSG_INVALID = "Sorry, I couldn't read that message. Please try again.";
 const MSG_RATE_LIMIT =
