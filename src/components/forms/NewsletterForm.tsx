@@ -84,6 +84,14 @@ export function NewsletterForm() {
           </PillButton>
         </div>
 
+        <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink/60">
+          By subscribing you agree to receive The Velure Letter by email. Unsubscribe anytime
+          with the link in every letter.{" "}
+          <a href="/privacy" className="underline underline-offset-2">
+            Privacy Policy
+          </a>
+        </p>
+
         {/* Honeypot: must stay empty. */}
         <input
           type="text"

@@ -613,6 +613,9 @@ export function BookingForm({
                   {...register("notes")}
                 />
               </div>
+              <p className="mt-1.5 text-[0.8125rem] opacity-60">
+                Please don&apos;t include medical details here.
+              </p>
               <FieldError id={`${variant}-notes-err`} message={errors.notes?.message} />
             </div>
 
@@ -650,6 +653,12 @@ export function BookingForm({
                       </span>
                     </label>
                     <FieldError id={`${variant}-consent-err`} message={errors.consent?.message} />
+                    <p className="mt-2 pl-7 text-[0.8125rem] opacity-60">
+                      How we handle your data:{" "}
+                      <a href="/privacy" target="_blank" className="underline underline-offset-2">
+                        Privacy Policy
+                      </a>
+                    </p>
                   </div>
                 )}
               />

@@ -22,6 +22,7 @@ import {
   type BookingAction,
 } from "@/lib/chat";
 import { cn } from "@/lib/utils";
+import { hardNavigate } from "@/lib/navigate";
 
 type Role = "user" | "assistant";
 type ChatMessage = { id: string; role: Role; text: string; action?: BookingAction | null };
@@ -307,7 +308,8 @@ export function ChatWidget() {
 
   const goToContact = () => {
     setOpen(false);
-    scrollTo("#contact", { offset: NAV_OFFSET });
+    if (document.getElementById("contact")) scrollTo("#contact", { offset: NAV_OFFSET });
+    else hardNavigate("/#contact");
   };
 
   const hasUserMessage = messages.some((m) => m.role === "user");
@@ -452,8 +454,16 @@ export function ChatWidget() {
             </div>
             <div className="mt-2.5 flex items-start justify-between gap-3 text-[0.6875rem] leading-4 text-taupe">
               <p>
-                AI assistant, may make mistakes. Velure is a demo by Thaus; conversations may be
-                saved.{" "}
+                AI assistant, may make mistakes. Not medical advice. Velure is a demo by Thaus;
+                conversations are saved.{" "}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  className="underline underline-offset-2 hover:text-espresso"
+                >
+                  Privacy
+                </a>
+                {" · "}
                 <a
                   href="#contact"
                   onClick={(e) => {

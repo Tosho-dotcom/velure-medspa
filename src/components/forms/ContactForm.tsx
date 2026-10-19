@@ -162,6 +162,13 @@ export function ContactForm() {
             {loading ? "Sending…" : "Send message"}
           </span>
         </PillButton>
+        <p className="mt-3 text-[0.8125rem] leading-relaxed text-ink/60">
+          Please don&apos;t include medical details. How we handle your message:{" "}
+          <a href="/privacy" className="underline underline-offset-2">
+            Privacy Policy
+          </a>
+          .
+        </p>
       </div>
 
       <div aria-live="polite" className="min-h-6">

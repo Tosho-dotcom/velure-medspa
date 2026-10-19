@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 import { cn } from "@/lib/utils";
-import { heroGate } from "@/lib/motion";
+import { afterFonts, heroGate } from "@/lib/motion";
 import { NAV_OFFSET, navLinks } from "@/lib/nav-links";
+import { hardNavigate } from "@/lib/navigate";
 import { Wordmark } from "@/components/ui/wordmark";
 import { PillButton } from "@/components/ui/pill-button";
 import { useSmoothScroll } from "@/components/motion/SmoothScroll";
@@ -17,6 +20,8 @@ import { MobileMenu } from "@/components/layout/MobileMenu";
 export function Nav() {
   const { scrollTo } = useSmoothScroll();
   const booking = useBooking();
+  // Sub-pages (legal) have no hero: solid bar from the start, links go back home.
+  const isHome = usePathname() === "/";
 
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -25,11 +30,38 @@ export function Nav() {
   const barRef = useRef<HTMLElement>(null);
   const lastY = useRef(0);
 
+  // Arriving on the home page with a hash (e.g. /#treatments from a legal page):
+  // wait for fonts and pinned sections, then scroll there smoothly.
+  useEffect(() => {
+    if (!isHome) return;
+    const hash = window.location.hash;
+    if (!hash || hash === "#top" || !document.querySelector(hash)) return;
+    // Pinned sections add their spacing only after load + fonts, so measure last.
+    let timer = 0;
+    let cancelFonts = () => {};
+    const go = () => {
+      ScrollTrigger.refresh();
+      scrollTo(hash, { offset: NAV_OFFSET, immediate: true });
+    };
+    const run = () => {
+      cancelFonts = afterFonts(() => {
+        timer = window.setTimeout(go, 400);
+      });
+    };
+    if (document.readyState === "complete") run();
+    else window.addEventListener("load", run, { once: true });
+    return () => {
+      window.removeEventListener("load", run);
+      cancelFonts();
+      window.clearTimeout(timer);
+    };
+  }, [isHome, scrollTo]);
+
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
       const vh = window.innerHeight;
-      setScrolled(y > vh * 0.85);
+      setScrolled(!isHome || y > vh * 0.85);
       if (y > vh * 1.2 && y > lastY.current + 4) setHidden(true);
       else if (y < lastY.current - 4) setHidden(false);
       lastY.current = y;
@@ -37,7 +69,7 @@ export function Nav() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isHome]);
 
   useEffect(() => {
     const onTheme = (e: Event) => setTheme((e as CustomEvent<PageTheme>).detail);
@@ -58,7 +90,7 @@ export function Nav() {
           const { reduce } = ctx.conditions as { reduce: boolean };
           const el = barRef.current;
           if (!el) return;
-          if (reduce) {
+          if (reduce || !isHome) {
             gsap.set(el, { autoAlpha: 1 });
             return;
           }
@@ -79,10 +111,11 @@ export function Nav() {
       );
       return () => mm.revert();
     },
-    { scope: barRef },
+    { scope: barRef, dependencies: [isHome] },
   );
 
   const go = (target: string) => (e: React.MouseEvent) => {
+    if (!isHome) return; // normal navigation to /#section
     e.preventDefault();
     setMenuOpen(false);
     scrollTo(target, { offset: NAV_OFFSET });
@@ -125,8 +158,9 @@ export function Nav() {
           className="wrap flex h-full items-center justify-between"
         >
           <a
-            href="#top"
+            href={isHome ? "#top" : "/"}
             onClick={(e) => {
+              if (!isHome) return;
               e.preventDefault();
               setMenuOpen(false);
               scrollTo(0);
@@ -140,7 +174,7 @@ export function Nav() {
             {navLinks.map((l) => (
               <li key={l.target}>
                 <a
-                  href={l.target}
+                  href={isHome ? l.target : `/${l.target}`}
                   onClick={go(l.target)}
                   className="link-underline text-[0.9375rem] tracking-wide"
                 >
@@ -188,7 +222,8 @@ export function Nav() {
         onClose={() => setMenuOpen(false)}
         onNavigate={(target) => {
           setMenuOpen(false);
-          scrollTo(target, { offset: NAV_OFFSET });
+          if (isHome) scrollTo(target, { offset: NAV_OFFSET });
+          else hardNavigate(`/${target}`);
         }}
         onBook={() => {
           setMenuOpen(false);

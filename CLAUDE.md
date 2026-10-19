@@ -6,6 +6,7 @@ Thaus Project #001. A minimal, luxury, single-page med spa site with a live book
 - `specs/velure_site_spec.json` — brand, tokens, sections, copy, motion, a11y, performance.
 - `specs/velure_booking_spec.json` — booking form fields, rules, states, request/response contract.
 - `specs/velure_chat_spec.json` — chat assistant: /api/chat contract, widget UI, availability webhook.
+- `src/lib/legal.ts` + `src/app/{privacy,terms,cookies,disclaimer}` — legal pages; `docs/legal-client-deployments.md` says what changes for a real client. Keep them true to what the site actually collects: new forms, trackers or providers must be added to the Privacy and Cookies pages in the same commit.
 - `n8n/` — backend workflows (do not edit from the frontend side; the contract is in the booking spec).
 - Copy is final English copy. Do not invent new claims, prices or testimonials.
 

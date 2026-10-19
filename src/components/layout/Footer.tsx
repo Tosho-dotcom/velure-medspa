@@ -7,6 +7,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { SplitText } from "gsap/SplitText";
 
 import { afterFontsIn } from "@/lib/motion";
+import { legalPages } from "@/lib/legal";
 
 const columns = [
   { title: "Visit", lines: ["1200 Desert Bloom Ave", "Scottsdale, AZ"] },
@@ -95,6 +96,18 @@ export function Footer() {
             </div>
           ))}
         </div>
+
+        <nav aria-label="Legal" className="border-b border-ink/15 py-6">
+          <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink/75">
+            {legalPages.map((p) => (
+              <li key={p.href}>
+                <a href={p.href} className="link-underline">
+                  {p.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         <div className="flex flex-col gap-3 py-8 text-sm text-ink/70 sm:flex-row sm:items-center sm:justify-between">
           <p>
