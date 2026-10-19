@@ -1,0 +1,349 @@
+{
+  "name": "Velure Chat — Contact Request",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "name",
+              "type": "string"
+            },
+            {
+              "name": "email",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "type": "string"
+            },
+            {
+              "name": "question",
+              "type": "string"
+            },
+            {
+              "name": "sessionId",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        300
+      ],
+      "id": "157a0e2a-0033-5c33-820b-a5abf7679b03",
+      "name": "When Called by Chat",
+      "notes": "Called by the save_contact_request tool in 'Velure Chat Assistant'."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure — validate a contact request collected by the chat assistant.\nconst j = $input.first().json;\nconst s = (v) => (v === null || v === undefined ? '' : String(v).trim());\n\nconst email = s(j.email).toLowerCase();\nconst question = s(j.question).slice(0, 900);\nconst phone = s(j.phone).replace(/[^0-9+()\\-\\s]/g, '').slice(0, 20);\nlet name = s(j.name).slice(0, 80);\nif (['null', 'none', 'undefined', 'n/a'].includes(name.toLowerCase())) name = '';\n\nif (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email)) {\n  return [{ json: { valid: false, result: { ok: false, error: 'The email address looks invalid. Ask the visitor to check it.' } } }];\n}\nif (question.length < 5) {\n  return [{ json: { valid: false, result: { ok: false, error: 'The question is missing. Pass the visitor\\'s question in one to three sentences.' } } }];\n}\n\nconst displayName = name || 'Chat visitor';\nreturn [{ json: { valid: true, data: {\n  name: displayName,\n  firstName: name ? name.split(/\\s+/)[0] : '',\n  email,\n  phone,\n  question,\n  message: `[Chat assistant] ${question}`,\n  sessionId: s(j.sessionId).slice(0, 64),\n} } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "id": "dca6475d-a63c-537f-b4c7-2ef16c2aef8d",
+      "name": "Validate Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "8aff5a43-8dd4-5839-bae0-358f5a8e6c5b",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ],
+      "id": "8d0979aa-0b88-5f69-b255-72d463711fd1",
+      "name": "Valid?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        480
+      ],
+      "id": "c8946179-25a9-5d61-8e69-54dd3582e164",
+      "name": "Invalid Result"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_LEADS_DB_ID",
+          "mode": "id"
+        },
+        "title": "={{ $('Validate Request').first().json.data.name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $('Validate Request').first().json.data.email }}"
+            },
+            {
+              "key": "Phone|phone_number",
+              "phoneValue": "={{ $('Validate Request').first().json.data.phone || '—' }}"
+            },
+            {
+              "key": "Message|rich_text",
+              "textContent": "={{ $('Validate Request').first().json.data.message }}"
+            },
+            {
+              "key": "Source|select",
+              "selectValue": "Chat assistant"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        220
+      ],
+      "id": "01d9e56a-5483-5ca8-8abe-11b1dfa55b0d",
+      "name": "Create Lead",
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, error: 'The request could not be saved. Ask the visitor to use the contact form on the page or call (480) 555-0142.' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        420
+      ],
+      "id": "f2c0d690-9e97-5e79-a44d-96705dccdb3e",
+      "name": "Save Failed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared Velure email shell (inline styles only — email clients ignore <style> blocks)\nconst shell = (title, bodyHtml) => `<!doctype html><html><body style=\"margin:0;padding:0;background:#FAF6F1;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#FAF6F1;padding:40px 16px;\">\n<tr><td align=\"center\">\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;background:#FFFFFF;border:1px solid #EFE6DA;border-radius:14px;\">\n<tr><td style=\"padding:40px 40px 8px 40px;font-family:Georgia,'Times New Roman',serif;font-size:26px;letter-spacing:-0.5px;color:#2B2420;\">Velure</td></tr>\n<tr><td style=\"padding:0 40px;font-family:Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#B08968;\">Med Spa &middot; Scottsdale</td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;\"><div style=\"height:1px;background:#EFE6DA;line-height:1px;\">&nbsp;</div></td></tr>\n<tr><td style=\"padding:28px 40px 0 40px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.25;color:#2B2420;\">${title}</td></tr>\n<tr><td style=\"padding:16px 40px 36px 40px;font-family:Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#4A3F39;\">${bodyHtml}</td></tr>\n</table>\n<table role=\"presentation\" width=\"560\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:560px;width:100%;\">\n<tr><td style=\"padding:20px 8px;font-family:Helvetica,Arial,sans-serif;font-size:11px;line-height:1.6;color:#8A7D74;text-align:center;\">\nVelure Med Spa &middot; 1200 Desert Bloom Ave, Scottsdale, AZ &middot; (480) 555-0142<br>\nVelure is a fictional brand created as a demonstration project by <a href=\"https://thaus.co\" style=\"color:#8A7D74;\">Thaus</a>.\n</td></tr></table>\n</td></tr></table></body></html>`;\nconst esc = (v) => String(v ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst row = (k, v) => `<tr><td style=\"padding:6px 0;color:#8A7D74;width:120px;vertical-align:top;\">${k}</td><td style=\"padding:6px 0;color:#2B2420;\">${v}</td></tr>`;\n\nconst d = $('Validate Request').first().json.data;\nconst clientHtml = shell(\n  d.firstName ? `Thank you, ${esc(d.firstName)}.` : 'Thank you.',\n  `<p style=\"margin:0 0 14px 0;\">Your question from our website chat has reached us. A member of our team will reply within one business day.</p>\n   <p style=\"margin:0 0 6px 0;color:#8A7D74;font-size:13px;\">Your question</p>\n   <p style=\"margin:0 0 22px 0;padding:14px 16px;background:#FAF6F1;border-radius:8px;white-space:pre-line;\">${esc(d.question)}</p>\n   <p style=\"margin:0;\">In the meantime, you are welcome to <a href=\"https://velure-medspa.vercel.app/#treatments\" style=\"color:#B08968;\">explore our treatments</a> or book a consultation online.</p>\n   <p style=\"margin:22px 0 0 0;color:#2B2420;\">With care,<br>The Velure team</p>`\n);\nconst ownerHtml = shell('New question from the chat',\n  `<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:100%;font-size:14px;\">\n   ${row('Name', esc(d.name))}${row('Email', esc(d.email))}${row('Phone', esc(d.phone) || '—')}${row('Session', esc(d.sessionId) || '—')}\n   </table>\n   <p style=\"margin:18px 0 0 0;padding:14px 16px;background:#FAF6F1;border-radius:8px;white-space:pre-line;\">${esc(d.question)}</p>\n   <p style=\"margin:14px 0 0 0;color:#8A7D74;font-size:13px;\">The full conversation is in Notion: Velure Chat Logs, filtered by this session.</p>`);\nreturn [{ json: { ...d, clientHtml, ownerHtml,\n  clientSubject: 'We received your question — Velure Med Spa',\n  ownerSubject: `[Velure] Chat question — ${d.name}` } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        220
+      ],
+      "id": "f60639aa-6928-5953-93a5-3cb4fa90d0ed",
+      "name": "Build Emails"
+    },
+    {
+      "parameters": {
+        "fromEmail": "Velure Med Spa <owner@example.com>",
+        "toEmail": "owner@example.com",
+        "subject": "={{ $json.ownerSubject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.ownerHtml }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.email }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        220
+      ],
+      "id": "d0e01128-1a35-5a01-94f0-08a53a82402a",
+      "name": "Email Owner",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "Velure Med Spa <owner@example.com>",
+        "toEmail": "={{ $('Build Emails').first().json.email }}",
+        "subject": "={{ $('Build Emails').first().json.clientSubject }}",
+        "emailFormat": "html",
+        "html": "={{ $('Build Emails').first().json.clientHtml }}",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "owner@example.com"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1320,
+        220
+      ],
+      "id": "7b5b5bf9-8bc5-5ca4-bfe8-3df46d99400c",
+      "name": "Auto-reply Client",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, message: 'Saved. The team will reply by email within one business day, and a confirmation email is on its way to the visitor.' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        220
+      ],
+      "id": "1dbb70ba-15a6-5420-ab3e-3a8910b269bf",
+      "name": "Done",
+      "notes": "Last node of the success path: its output is what the assistant reads. Emails failing does not undo the saved lead."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called by Chat": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invalid Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Lead": {
+      "main": [
+        [
+          {
+            "node": "Build Emails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Emails": {
+      "main": [
+        [
+          {
+            "node": "Email Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Owner": {
+      "main": [
+        [
+          {
+            "node": "Auto-reply Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-reply Client": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

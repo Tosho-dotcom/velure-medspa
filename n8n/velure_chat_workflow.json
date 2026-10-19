@@ -1,0 +1,770 @@
+{
+  "name": "Velure Chat Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "velure-chat",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -2320,
+        208
+      ],
+      "id": "d16b33e2-da2d-58e2-9228-0af9ed5faf43",
+      "name": "Webhook — Chat Message",
+      "webhookId": "509c6312-8254-5d5b-a4d1-09eaa8fb8a54",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Velure Chat Secret"
+        }
+      },
+      "notes": "Called ONLY by the Next.js /api/chat route on the Velure site (server-to-server), never by the browser. Header Auth credential: Name = X-Velure-Secret, Value = a long random string. The same value goes into Vercel env N8N_CHAT_SECRET. Expected body: { sessionId, message }."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst message = typeof body.message === 'string' ? body.message.trim() : '';\nconst sessionId = typeof body.sessionId === 'string' ? body.sessionId : '';\nconst reject = (status, reply) => [{ json: { ok: false, status, reply } }];\n\nif (!/^[A-Za-z0-9_-]{8,64}$/.test(sessionId)) return reject(400, 'Something went wrong. Please refresh the page and try again.');\nif (!message) return reject(400, 'Please type a message.');\nif (message.length > 500) return reject(400, 'Please keep messages under 500 characters.');\n\n// Server-side limits (defense in depth; the main rate limit lives in the Next.js API route)\nconst DAILY_CAP = 400;   // total messages per day across all visitors\nconst SESSION_CAP = 40;  // messages per conversation per day\nconst data = $getWorkflowStaticData('global');\nconst today = new Date().toISOString().slice(0, 10);\nif (data.day !== today) { data.day = today; data.total = 0; data.sessions = {}; }\ndata.total = (data.total || 0) + 1;\ndata.sessions = data.sessions || {};\ndata.sessions[sessionId] = (data.sessions[sessionId] || 0) + 1;\n\nif (data.total > DAILY_CAP) return reject(429, 'Our assistant is taking a short break. Please use the contact form below or call (480) 555-0142.');\nif (data.sessions[sessionId] > SESSION_CAP) return reject(429, \"You've reached the message limit for this conversation. For anything else, please use the contact form or call (480) 555-0142.\");\n\nreturn [{ json: { ok: true, message, sessionId } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        208
+      ],
+      "id": "09f521a5-54ce-5114-9db3-1c9d812bde73",
+      "name": "Validate & Limit",
+      "notes": "Daily caps reset at midnight UTC. Static data is only saved in production executions (workflow active), not in manual test runs."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "93deef16-2070-5b2b-bb2a-b4d35f8d766e",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1840,
+        208
+      ],
+      "id": "a8dd2722-6e6f-5e9e-8519-5f75dfd16bde",
+      "name": "If Allowed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $input.first().json;\nconst c = $getWorkflowStaticData('global');\nconst TTL = 10 * 60 * 1000; // re-read Notion at most every 10 minutes\nconst fresh = !!(c.kbCache && (Date.now() - c.kbCache.at) < TTL);\nreturn [{ json: { message: req.message, sessionId: req.sessionId, cached: fresh, systemPrompt: fresh ? c.kbCache.systemPrompt : '' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        112
+      ],
+      "id": "04ecdd3b-b495-54e7-9f66-813b84101d2c",
+      "name": "Check Cache",
+      "notes": "Knowledge Base + System Prompt are cached for 10 minutes. After editing them in Notion, changes go live within 10 minutes (or immediately after deactivating/reactivating the workflow)."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "42221e36-4915-5fa6-b194-0b34986013ed",
+              "leftValue": "={{ $json.cached }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1360,
+        112
+      ],
+      "id": "2766f6e0-784c-5f6e-8110-b43635c7b858",
+      "name": "If Cached"
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "operation": "getAll",
+        "blockId": {
+          "__rl": true,
+          "value": "NOTION_KB_PAGE_ID",
+          "mode": "id"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -1120,
+        272
+      ],
+      "id": "feffeeb3-d9a2-530a-81a8-d62e70023865",
+      "name": "Get Knowledge Base",
+      "executeOnce": true,
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Reads all blocks of 'Velure AI Assistant / Knowledge Base'. Callouts are skipped."
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "operation": "getAll",
+        "blockId": {
+          "__rl": true,
+          "value": "NOTION_PROMPT_PAGE_ID",
+          "mode": "id"
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -880,
+        272
+      ],
+      "id": "fe0e1bad-ea7b-56f5-b048-049429987c1d",
+      "name": "Get System Prompt",
+      "executeOnce": true,
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Reads 'Velure AI Assistant / System Prompt'. Only the CODE BLOCK on that page is used."
+    },
+    {
+      "parameters": {
+        "jsCode": "const richText = (arr) => (Array.isArray(arr) ? arr.map(r => r.plain_text ?? r.text?.content ?? '').join('') : '');\nconst blockText = (b) => {\n  const d = b.type ? b[b.type] : null;\n  if (d && Array.isArray(d.rich_text)) return richText(d.rich_text);\n  if (typeof b.content === 'string') return b.content; // simplified Notion output\n  return '';\n};\nconst prefixes = { heading_1: '# ', heading_2: '## ', heading_3: '### ', bulleted_list_item: '- ', numbered_list_item: '- ', to_do: '- ' };\n\nconst kbBlocks = $('Get Knowledge Base').all().map(i => i.json);\nconst kb = kbBlocks\n  .filter(b => b.type !== 'callout')\n  .map(b => { const t = blockText(b); return t ? (prefixes[b.type] || '') + t : ''; })\n  .filter(Boolean)\n  .join('\\n');\n\nconst promptBlocks = $('Get System Prompt').all().map(i => i.json);\nconst codeBlock = promptBlocks.find(b => b.type === 'code');\nconst prompt = codeBlock ? blockText(codeBlock) : '';\n\nif (!kb || !prompt) {\n  throw new Error('Knowledge Base or System Prompt is empty. Check the Notion pages, the code block on the System Prompt page, and that the n8n integration is connected to \"Velure Med Spa — CRM\".');\n}\n\nlet systemPrompt = prompt.includes('{{KNOWLEDGE_BASE}}')\n  ? prompt.replace('{{KNOWLEDGE_BASE}}', kb)\n  : prompt + '\\n\\n<knowledge_base>\\n' + kb + '\\n</knowledge_base>';\n// Curly braces can break the agent's prompt template; replace any that remain.\nsystemPrompt = systemPrompt.replace(/\\{/g, '(').replace(/\\}/g, ')');\n\nconst cache = $getWorkflowStaticData('global');\ncache.kbCache = { at: Date.now(), systemPrompt };\n\nconst req = $('Check Cache').first().json;\nreturn [{ json: { message: req.message, sessionId: req.sessionId, systemPrompt } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        272
+      ],
+      "id": "d79b3ec8-50db-5b28-99fe-c9e0302d4a19",
+      "name": "Build System Prompt"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}\n\n<context>\nCurrent date and time in Scottsdale (America/Phoenix): {{ $now.setZone('America/Phoenix').toFormat(\"cccc, LLLL d, yyyy 'at' h:mm a\") }}.\nNext 8 days: {{ Array.from({ length: 8 }, (_, i) => $now.setZone('America/Phoenix').plus({ days: i }).toFormat('ccc yyyy-MM-dd')).join(', ') }}.\n</context>",
+          "maxIterations": 6,
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        112
+      ],
+      "id": "cf4d82bf-79a1-536a-b29b-8ee17b9412cf",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput",
+      "notes": "The context block appends the current Scottsdale date, so relative dates resolve correctly. Return Intermediate Steps must stay ON: Format Reply reads the suggest_booking result from it."
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-5-5",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 5.5"
+        },
+        "options": {
+          "maxTokensToSample": 600
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -560,
+        352
+      ],
+      "id": "474d8334-06e9-5892-9ebc-c7ba585b468c",
+      "name": "Claude Haiku",
+      "credentials": {
+        "anthropicApi": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic account"
+        }
+      },
+      "notes": "Same Anthropic credential as the Thaus chat assistant. maxTokensToSample caps reply length (and cost)."
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.sessionId }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -420,
+        352
+      ],
+      "id": "4e97eb7d-d030-5976-a624-aede73ed19d9",
+      "name": "Conversation Memory",
+      "notes": "Remembers the last 10 exchanges per sessionId. In-memory: cleared when n8n restarts."
+    },
+    {
+      "parameters": {
+        "description": "Check free appointment times at Velure. Returns free start times per open day (24-hour HH:mm, Arizona time). Call before naming or offering any specific time. Sundays are skipped automatically.",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Velure — Availability"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date_from": "={{ $fromAI('date_from', 'First date to check, YYYY-MM-DD in Arizona time. Earliest is tomorrow.', 'string') }}",
+            "days": "={{ $fromAI('days', 'How many open days to check, 1 to 5', 'number') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date_from",
+              "displayName": "date_from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "number"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -280,
+        352
+      ],
+      "id": "c1c3a893-472e-5110-a2cf-276aaaf2287b",
+      "name": "check_availability",
+      "notes": "Tool name must stay 'check_availability' (the System Prompt refers to it). After import, pick the 'Velure — Availability' workflow in the dropdown."
+    },
+    {
+      "parameters": {
+        "description": "Show the visitor a Book button that opens the booking panel with the treatment, and optionally the date and time, already filled in. This is the only way to give the visitor a booking link. It does not book anything.",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Velure Chat — Booking Link"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "treatmentId": "={{ $fromAI('treatmentId', 'Booking id: signature-glow-facial, wrinkle-relaxers, dermal-fillers, collagen-microneedling, laser-rejuvenation, body-contouring or consultation', 'string') }}",
+            "date": "={{ $fromAI('date', 'YYYY-MM-DD shown as free by check_availability, or empty string', 'string') }}",
+            "time": "={{ $fromAI('time', 'HH:mm (24-hour) shown as free by check_availability, or empty string', 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "treatmentId",
+              "displayName": "treatmentId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        -140,
+        352
+      ],
+      "id": "93d288fa-09f5-5776-b60e-1adce7659e01",
+      "name": "suggest_booking",
+      "notes": "Tool name must stay 'suggest_booking' (the System Prompt refers to it). After import, pick the 'Velure Chat — Booking Link' workflow in the dropdown."
+    },
+    {
+      "parameters": {
+        "description": "Pass a visitor's question to the Velure team, who reply by email within one business day. Call only after the visitor agreed and gave an email address. At most once per conversation unless they correct their details.",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_ME",
+          "mode": "list",
+          "cachedResultName": "Velure Chat — Contact Request"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "name": "={{ $fromAI('name', 'Visitor name, or empty string if not given', 'string') }}",
+            "email": "={{ $fromAI('email', 'Visitor email address exactly as written', 'string') }}",
+            "phone": "={{ $fromAI('phone', 'Visitor phone number, or empty string if not given', 'string') }}",
+            "question": "={{ $fromAI('question', 'The visitor\\'s question in one to three sentences, faithful to their words', 'string') }}",
+            "sessionId": "={{ $('Check Cache').first().json.sessionId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        352
+      ],
+      "id": "048bebe7-5506-555d-96f5-b97d7f3c2bf0",
+      "name": "save_contact_request",
+      "notes": "Tool name must stay 'save_contact_request' (the System Prompt refers to it). After import, pick the 'Velure Chat — Contact Request' workflow in the dropdown."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure — shape the reply for the website: { reply, action? }.\n// The Book button comes ONLY from a successful suggest_booking tool call,\n// never from text the model wrote, so a reply cannot invent one.\nconst out = $input.first().json || {};\nconst steps = Array.isArray(out.intermediateSteps) ? out.intermediateSteps : [];\n\nconst parse = (v) => {\n  if (v && typeof v === 'object') return v;\n  if (typeof v !== 'string') return null;\n  try { return JSON.parse(v); } catch { return null; }\n};\n// Sub-workflow tools may return an object, an array of items, or a JSON string of either.\nconst unwrap = (v) => {\n  let x = parse(v);\n  if (Array.isArray(x)) x = x[0];\n  if (x && x.json && typeof x.json === 'object') x = x.json;\n  if (x && typeof x.response === 'string') { const inner = parse(x.response); if (inner) x = inner; }\n  return x && typeof x === 'object' ? x : null;\n};\n\nconst TREATMENTS = new Set(['signature-glow-facial','wrinkle-relaxers','dermal-fillers',\n  'collagen-microneedling','laser-rejuvenation','body-contouring','consultation']);\nconst clean = (a) => {\n  if (!a || a.type !== 'book' || !TREATMENTS.has(a.treatmentId)) return null;\n  const date = typeof a.date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(a.date) ? a.date : null;\n  const time = date && typeof a.time === 'string' && /^\\d{2}:\\d{2}$/.test(a.time) ? a.time : null;\n  return { type: 'book', treatmentId: a.treatmentId, date, time };\n};\n\nlet action = null;\nconst tools = [];\nfor (const step of steps) {\n  const name = step && step.action && step.action.tool;\n  if (!name) continue;\n  tools.push(name);\n  if (name !== 'suggest_booking') continue;\n  const result = unwrap(step.observation);\n  if (result && result.ok === true) action = clean(result.action) || action;\n}\n\nlet reply = typeof out.output === 'string' ? out.output.trim() : '';\n// The widget renders plain text: strip stray markdown emphasis and headings.\nreply = reply.replace(/\\*\\*(.+?)\\*\\*/g, '$1').replace(/^#{1,6}\\s+/gm, '');\nif (!reply) {\n  reply = action\n    ? 'You can finish your booking with the button below.'\n    : 'Sorry, I could not put an answer together. Please try again, or use the contact form.';\n}\n\nreturn [{ json: { reply, action, tools: [...new Set(tools)] } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b0b31010-aed3-54c3-9708-4be719dfd7b4",
+      "name": "Format Reply",
+      "notes": "Builds { reply, action }. The Book button comes only from a successful suggest_booking call."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: $json.reply, action: $json.action }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        240,
+        0
+      ],
+      "id": "2125076f-3bc8-5cb8-83e0-e00719b74e12",
+      "name": "Respond — Reply"
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "NOTION_CHAT_LOGS_DB_ID",
+          "mode": "id"
+        },
+        "title": "={{ $('Check Cache').first().json.message.slice(0, 100) }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Full message|rich_text",
+              "textContent": "={{ $('Check Cache').first().json.message }}"
+            },
+            {
+              "key": "Reply|rich_text",
+              "textContent": "={{ ($('Format Reply').first().json.reply || '').slice(0, 1900) }}"
+            },
+            {
+              "key": "Action|rich_text",
+              "textContent": "={{ $('Format Reply').first().json.action ? JSON.stringify($('Format Reply').first().json.action) : '' }}"
+            },
+            {
+              "key": "Tools|rich_text",
+              "textContent": "={{ ($('Format Reply').first().json.tools || []).join(', ') }}"
+            },
+            {
+              "key": "Session ID|rich_text",
+              "textContent": "={{ $('Check Cache').first().json.sessionId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "id": "104f6a93-959f-525a-ad3d-1f1d8d7fb0ac",
+      "name": "Log to Chat Logs",
+      "executeOnce": true,
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Runs AFTER the reply is sent, so logging never slows the chat. If logging fails, the visitor is not affected."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: \"Sorry, something went wrong on my side. Please try again, or use the contact form below.\" }) }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        208
+      ],
+      "id": "857bb25a-da48-5ad6-b386-10079bc86e19",
+      "name": "Respond — Agent Error"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ reply: $json.reply }) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -1600,
+        368
+      ],
+      "id": "8de88df1-e869-54d1-b032-8c16c2eb2c65",
+      "name": "Respond — Rejected"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook — Chat Message": {
+      "main": [
+        [
+          {
+            "node": "Validate & Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Limit": {
+      "main": [
+        [
+          {
+            "node": "If Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Allowed": {
+      "main": [
+        [
+          {
+            "node": "Check Cache",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond — Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Cache": {
+      "main": [
+        [
+          {
+            "node": "If Cached",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Cached": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get Knowledge Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Knowledge Base": {
+      "main": [
+        [
+          {
+            "node": "Get System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get System Prompt": {
+      "main": [
+        [
+          {
+            "node": "Build System Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build System Prompt": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond — Agent Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond — Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond — Reply": {
+      "main": [
+        [
+          {
+            "node": "Log to Chat Logs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude Haiku": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check_availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "suggest_booking": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "save_contact_request": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

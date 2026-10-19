@@ -14,9 +14,12 @@ import dynamic from "next/dynamic";
 const loadPanel = () => import("@/components/booking/BookingPanel").then((m) => m.BookingPanel);
 const BookingPanel = dynamic(loadPanel, { ssr: false });
 
+/** Date (YYYY-MM-DD) and time (HH:mm) to fill in, e.g. from the chat assistant. */
+export type BookingPrefill = { date?: string | null; time?: string | null };
+
 type BookingApi = {
-  /** Open the booking panel, optionally with a treatment preselected. */
-  open: (treatmentId?: string) => void;
+  /** Open the booking panel, optionally with a treatment (and a date/time) preselected. */
+  open: (treatmentId?: string, prefill?: BookingPrefill) => void;
   close: () => void;
   /** True while the panel is open (the nav hides itself behind it). */
   isOpen: boolean;
@@ -33,6 +36,7 @@ export function useBooking(): BookingApi {
 export function BookingProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [treatmentId, setTreatmentId] = useState<string | undefined>();
+  const [prefill, setPrefill] = useState<BookingPrefill | undefined>();
   // The panel code is only mounted after the first open.
   const [wasOpened, setWasOpened] = useState(false);
 
@@ -45,8 +49,9 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const open = useCallback((id?: string) => {
+  const open = useCallback((id?: string, pre?: BookingPrefill) => {
     setTreatmentId(id);
+    setPrefill(pre);
     setWasOpened(true);
     setIsOpen(true);
   }, []);
@@ -58,7 +63,12 @@ export function BookingProvider({ children }: { children: ReactNode }) {
     <BookingContext.Provider value={api}>
       {children}
       {wasOpened && (
-        <BookingPanel open={isOpen} treatmentId={treatmentId} onOpenChange={setIsOpen} />
+        <BookingPanel
+          open={isOpen}
+          treatmentId={treatmentId}
+          prefill={prefill}
+          onOpenChange={setIsOpen}
+        />
       )}
     </BookingContext.Provider>
   );

@@ -156,3 +156,68 @@ return `ok: True` **without** a `bookingId` and must not create a record.
 
 Unsubscribe: the link in the welcome email carries `&token=…`. The same link with a changed
 email or token must show "Link not recognised".
+
+## Chat assistant and live availability
+
+Four more workflows power the website chat (bubble bottom-right) and the live "taken" times in
+the booking form. Contract and UI: `specs/velure_chat_spec.json`.
+
+| File | Workflow | Trigger |
+|---|---|---|
+| `velure_availability_workflow.json` | Velure — Availability | chat tool + `GET /webhook/velure-availability?date=YYYY-MM-DD` |
+| `velure_chat_booking_link_workflow.json` | Velure Chat — Booking Link | chat tool (`suggest_booking`) |
+| `velure_chat_contact_request_workflow.json` | Velure Chat — Contact Request | chat tool (`save_contact_request`) |
+| `velure_chat_workflow.json` | Velure Chat Assistant | `POST /webhook/velure-chat` (Header Auth) |
+
+### Notion
+Under *Velure Med Spa — CRM* there is a page **Velure AI Assistant** with:
+
+| Item | ID placeholder | Notes |
+|---|---|---|
+| Knowledge Base (page) | `NOTION_KB_PAGE_ID` | Facts only. Callouts are ignored. Booking ids must match `src/lib/treatments.ts`. |
+| System Prompt (page) | `NOTION_PROMPT_PAGE_ID` | Only the code block is used. Keep `{{KNOWLEDGE_BASE}}`; no other curly braces. |
+| Velure Chat Logs (database) | `NOTION_CHAT_LOGS_DB_ID` | One row per reply: message, reply, action, tools, session. |
+
+*Velure Leads* has an extra `Source` option, **Chat assistant**. Because the page sits inside the
+CRM page, the existing n8n Notion connection already covers it.
+
+### Import order
+1. Import **Availability**, **Booking Link** and **Contact Request** first (the chat workflow
+   calls them). Select the Notion credential (and SMTP in Contact Request), replace the `NOTION_*`
+   IDs and `owner@example.com`, then **save** each one. Sub-workflows do not need to be active.
+2. Activate **Velure — Availability** (its webhook serves the booking form).
+3. Create a **Header Auth** credential *Velure Chat Secret*: name `X-Velure-Secret`, value a long
+   random string (40+ characters). The same value goes into Vercel as `N8N_CHAT_SECRET`.
+4. Import **Velure Chat Assistant**: select *Velure Chat Secret* on the webhook, the Notion and
+   Anthropic credentials, replace the `NOTION_*` IDs, and on the three tool nodes
+   (`check_availability`, `suggest_booking`, `save_contact_request`) pick the matching workflow in
+   the dropdown. Keep the tool node names unchanged; the System Prompt refers to them.
+5. Activate it.
+
+### Vercel environment variables
+`N8N_CHAT_WEBHOOK_URL`, `N8N_CHAT_SECRET`, `NEXT_PUBLIC_N8N_AVAILABILITY_WEBHOOK`, and optionally
+`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (rate limits) and `CHAT_ALLOWED_ORIGINS`
+(custom domain, with and without `www`). Redeploy after adding them: `NEXT_PUBLIC_*` values are
+built into the page.
+
+### How it behaves
+- **Availability** answers only from *Velure Bookings*: a slot is taken when a booking with
+  `Status = Confirmed` has that `Slot key`. Same rules as booking: Phoenix time, Monday to
+  Saturday, 09:00–18:00, tomorrow to +60 days. The public webhook returns only taken times,
+  never names or emails.
+- **The Book button** is created only from a successful `suggest_booking` call (node *Format
+  Reply*), never from text the model writes. The assistant cannot book, change or cancel.
+- **The current Scottsdale date** is appended to the system message on every call, outside the
+  10-minute cache, so "this Friday" resolves correctly.
+- **Limits:** 400 messages per day in total and 40 per conversation in n8n, plus per-IP and
+  per-session limits in `/api/chat` when Upstash is configured.
+
+### Quick test
+```powershell
+Invoke-RestMethod "https://your-n8n-instance.example.com/webhook/velure-availability?date=2026-10-27" -Headers @{ Origin = "http://localhost:3000" }
+
+$body = @{ sessionId = "test-session-0001"; message = "What's free next Tuesday for a facial?" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri "https://your-n8n-instance.example.com/webhook/velure-chat" -ContentType "application/json" -Headers @{ "X-Velure-Secret" = "<secret>" } -Body $body
+```
+Expect `{ ok, date, bookable, taken }` from the first call, and `{ reply, action }` with an
+action of type `book` from the second. A new row appears in *Velure Chat Logs*.

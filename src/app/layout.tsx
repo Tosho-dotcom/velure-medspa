@@ -9,6 +9,7 @@ import { BookingProvider } from "@/components/booking/BookingProvider";
 import { Preloader } from "@/components/layout/Preloader";
 import { Nav } from "@/components/layout/Nav";
 import { Footer } from "@/components/layout/Footer";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <Nav />
             <main id="main">{children}</main>
             <Footer />
+            <ChatWidget />
             <ThemeObserver />
           </BookingProvider>
         </SmoothScroll>

@@ -21,6 +21,8 @@ import {
   keyToDate,
 } from "@/lib/slots";
 import { postJSON } from "@/lib/submit";
+import { fetchTakenTimes } from "@/lib/availability";
+import type { BookingPrefill } from "@/components/booking/BookingProvider";
 import { useFormAge } from "@/hooks/useFormAge";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -122,16 +124,21 @@ function BlockTitle({ n, children }: { n: string; children: string }) {
 export function BookingForm({
   variant = "inline",
   treatmentId,
+  prefill,
   autoFocus = false,
   onClose,
 }: {
   variant?: "panel" | "inline";
   treatmentId?: string;
+  /** Date and time chosen elsewhere (the chat assistant). Applied once on mount. */
+  prefill?: BookingPrefill;
   autoFocus?: boolean;
   onClose?: () => void;
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [taken, setTaken] = useState<Set<string>>(() => new Set());
+  // Dates whose taken times have been fetched (or failed to fetch) from n8n.
+  const [checkedDates, setCheckedDates] = useState<Set<string>>(() => new Set());
   const [dateOpen, setDateOpen] = useState(false);
   const [confirmed, setConfirmed] = useState<{ email: string; date: string; time: string } | null>(
     null,
@@ -169,6 +176,14 @@ export function BookingForm({
       restored.time = undefined;
     }
     if (treatmentId) restored.treatmentId = treatmentId;
+    // A date/time picked in the chat wins over an older draft.
+    if (prefill?.date && isBookableDate(prefill.date)) {
+      restored.date = prefill.date;
+      restored.time =
+        prefill.time && (SLOTS as readonly string[]).includes(prefill.time)
+          ? (prefill.time as BookingValues["time"])
+          : undefined;
+    }
     reset(restored as BookingValues);
     restoredRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,6 +212,36 @@ export function BookingForm({
     return () => window.clearTimeout(t);
   }, [autoFocus, treatmentId]);
 
+
+  // Live availability: grey out times already booked for the chosen date.
+  // If the selected time turns out to be taken, clear it and say so.
+  const selectedDate = values.date;
+  useEffect(() => {
+    if (!selectedDate || !isBookableDate(selectedDate)) return;
+    const controller = new AbortController();
+    void fetchTakenTimes(selectedDate, { signal: controller.signal }).then((times) => {
+      if (controller.signal.aborted) return;
+      setCheckedDates((prev) => new Set(prev).add(selectedDate));
+      if (!times?.length) return;
+      setTaken((prev) => {
+        const next = new Set(prev);
+        for (const t of times) next.add(`${selectedDate}T${t}`);
+        return next;
+      });
+      const current = form.getValues("time");
+      if (current && times.includes(current)) {
+        setValue("time", undefined as unknown as BookingValues["time"]);
+        setStatus("slot_taken");
+      }
+    });
+    return () => controller.abort();
+  }, [selectedDate, form, setValue]);
+
+  const checkingTimes =
+    !!process.env.NEXT_PUBLIC_N8N_AVAILABILITY_WEBHOOK &&
+    !!selectedDate &&
+    isBookableDate(selectedDate) &&
+    !checkedDates.has(selectedDate);
 
   const summary = [
     values.treatmentId ? getTreatmentName(values.treatmentId) : null,
@@ -475,6 +520,11 @@ export function BookingForm({
             />
             {!values.date && (
               <p className="mt-2 text-sm opacity-60">Choose a date to see available times.</p>
+            )}
+            {checkingTimes && (
+              <p className="mt-2 text-sm opacity-60" aria-live="polite">
+                Checking available times…
+              </p>
             )}
             <FieldError id={`${variant}-time-err`} message={errors.time?.message} />
           </section>

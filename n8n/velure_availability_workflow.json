@@ -1,0 +1,269 @@
+{
+  "name": "Velure — Availability",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "date_from",
+              "type": "string"
+            },
+            {
+              "name": "days",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        120
+      ],
+      "id": "5508d2d9-671d-5107-8d3e-334c35afdfa4",
+      "name": "When Called by Chat",
+      "notes": "Called by the check_availability tool in 'Velure Chat Assistant'."
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "velure-availability",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "http://localhost:3000,https://velure-medspa.vercel.app"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        340
+      ],
+      "id": "e9e0e09d-2240-5c33-ad93-39bb7f52a31f",
+      "name": "Availability Webhook",
+      "webhookId": "63e1b50e-c96f-5681-b7b4-d4c144196e29",
+      "notes": "Public, read-only: GET /webhook/velure-availability?date=YYYY-MM-DD returns only the taken times for that date (no names or emails). Used by the booking form to grey out taken slots."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure — plan which dates to check. Works for both triggers:\n// the chat tool (date_from, days) and the public webhook (?date=YYYY-MM-DD).\nconst MAX_TOOL_DAYS = 5;    // open days per tool call (keeps one Notion page <= 100 rows)\nconst MAX_DAYS_AHEAD = 60;\n\n// Phoenix is UTC-7 all year (no DST)\nconst PHX_OFFSET_MS = 7 * 3600 * 1000;\nconst ymd = (d) => d.toISOString().slice(0, 10);\nconst addDays = (key, n) => {\n  const [y, m, d] = key.split('-').map(Number);\n  return ymd(new Date(Date.UTC(y, m - 1, d + n)));\n};\nconst isSunday = (key) => new Date(key + 'T12:00:00Z').getUTCDay() === 0;\nconst isDateKey = (v) => /^\\d{4}-\\d{2}-\\d{2}$/.test(v) && !isNaN(Date.parse(v + 'T12:00:00Z'));\n\nconst today = ymd(new Date(Date.now() - PHX_OFFSET_MS));\nconst min = addDays(today, 1);\nconst max = addDays(today, MAX_DAYS_AHEAD);\n\nconst j = $input.first().json;\nconst fromWebhook = !!(j.headers && (j.query || j.body));\nconst src = fromWebhook ? { ...(j.body || {}), ...(j.query || {}) } : j;\nconst notes = [];\nconst dates = [];\n\nif (fromWebhook) {\n  // The booking form asks for exactly one date.\n  const date = String(src.date ?? '').trim();\n  if (isDateKey(date) && date >= min && date <= max && !isSunday(date)) dates.push(date);\n} else {\n  let start = String(src.date_from ?? '').trim();\n  let days = Math.round(Number(src.days));\n  if (!Number.isFinite(days) || days < 1) days = 1;\n  if (days > MAX_TOOL_DAYS) {\n    notes.push(`days is limited to ${MAX_TOOL_DAYS}; call again with a later date_from for more.`);\n    days = MAX_TOOL_DAYS;\n  }\n  if (!isDateKey(start)) {\n    notes.push(`date_from was missing or invalid, so the search starts tomorrow (${min}).`);\n    start = min;\n  } else if (start < min) {\n    notes.push(`Online booking starts tomorrow (${min}); earlier dates cannot be booked online.`);\n    start = min;\n  }\n  if (start > max) {\n    notes.push(`Online booking is open up to ${max} only.`);\n  }\n  for (let d = start; d <= max && dates.length < days; d = addDays(d, 1)) {\n    if (isSunday(d)) {\n      if (d === start) notes.push(`${d} is a Sunday; Velure is closed on Sundays.`);\n      continue;\n    }\n    dates.push(d);\n  }\n}\n\n// Notion filter: confirmed bookings whose Slot key starts with one of the dates.\n// With no dates, a never-matching key keeps the query valid and returns nothing.\nconst keys = dates.length ? dates : ['0000-00-00'];\nconst filter = {\n  and: [\n    { property: 'Status', select: { equals: 'Confirmed' } },\n    { or: keys.map((d) => ({ property: 'Slot key', rich_text: { starts_with: d } })) },\n  ],\n};\n\nreturn [{ json: { fromWebhook, today, min, max, dates, notes, filter } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        230
+      ],
+      "id": "8353ad55-8424-5eb0-b0a5-914938d5b384",
+      "name": "Plan Range"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.notion.com/v1/databases/NOTION_BOOKINGS_DB_ID/query",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ filter: $json.filter, page_size: 100 }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        230
+      ],
+      "id": "e679aa80-de24-5b86-adc5-ce603f976f28",
+      "name": "Query Bookings",
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_ME",
+          "name": "Notion account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Notion API query: Status = Confirmed and Slot key starts with one of the planned dates. Uses the same Notion credential as the other Velure workflows."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure — turn confirmed bookings into free times per date.\nconst SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30',\n  '14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];\n\nconst plan = $('Plan Range').first().json;\nconst res = $input.first().json || {};\nconst ok = Array.isArray(res.results);\n\nconst taken = {};\nif (ok) {\n  for (const page of res.results) {\n    const rt = (page.properties && page.properties['Slot key'] && page.properties['Slot key'].rich_text) || [];\n    const key = rt.map((r) => r.plain_text || (r.text && r.text.content) || '').join('').trim();\n    const [d, t] = key.split('T');\n    if (d && t) (taken[d] = taken[d] || new Set()).add(t);\n  }\n}\n\nif (plan.fromWebhook) {\n  const date = plan.dates[0] || null;\n  const body = ok\n    ? { ok: true, date, bookable: !!date, taken: date ? [...(taken[date] || [])].sort() : [] }\n    : { ok: false, error: 'unavailable' };\n  return [{ json: { fromWebhook: true, status: ok ? 200 : 502, body } }];\n}\n\nif (!ok) {\n  return [{ json: { fromWebhook: false, result: {\n    ok: false,\n    error: 'Availability could not be checked right now. The booking panel on the website shows live times.',\n  } } }];\n}\n\nconst label = (key) => new Date(key + 'T12:00:00Z').toLocaleDateString('en-US', {\n  weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',\n});\n\nconst days = plan.dates.map((d) => {\n  const t = taken[d] || new Set();\n  const free = SLOTS.filter((s) => !t.has(s));\n  return { date: d, label: label(d), free };\n});\n\nconst lines = days.map((d) =>\n  `${d.label} (${d.date}): ${d.free.length ? d.free.join(', ') : 'fully booked'}`);\n\nreturn [{ json: { fromWebhook: false, result: {\n  ok: true,\n  today_in_scottsdale: plan.today,\n  bookable_range: `${plan.min} to ${plan.max}, Monday to Saturday`,\n  times_format: '24-hour HH:mm, Arizona time. Show them to the visitor as 10:30 AM.',\n  free_times: lines.length ? lines.join('\\n') : 'No bookable dates in the requested range.',\n  notes: plan.notes.join(' '),\n} } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        230
+      ],
+      "id": "2e0f96bd-d9e3-5771-82ef-d70e1091a446",
+      "name": "Build Availability"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "5e2d69b5-49dc-50ef-b7e0-0433f75151c6",
+              "leftValue": "={{ $json.fromWebhook }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        230
+      ],
+      "id": "f1e6fc06-5bd4-51a5-9edd-8f460bb1ad0e",
+      "name": "From Webhook?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": "={{ $json.status }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        120
+      ],
+      "id": "6868986c-3ca8-5d17-85d2-5c74f740d3e4",
+      "name": "Respond — Availability"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $input.first().json.result }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        340
+      ],
+      "id": "cdddb09a-8ea4-59a7-aa0a-6d1b752fbf8e",
+      "name": "Tool Result",
+      "notes": "Last node of the tool path: its output is what the assistant reads."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called by Chat": {
+      "main": [
+        [
+          {
+            "node": "Plan Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Webhook": {
+      "main": [
+        [
+          {
+            "node": "Plan Range",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Range": {
+      "main": [
+        [
+          {
+            "node": "Query Bookings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Bookings": {
+      "main": [
+        [
+          {
+            "node": "Build Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Availability": {
+      "main": [
+        [
+          {
+            "node": "From Webhook?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "From Webhook?": {
+      "main": [
+        [
+          {
+            "node": "Respond — Availability",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

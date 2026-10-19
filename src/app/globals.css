@@ -137,6 +137,13 @@ html.lenis body {
 .lenis.lenis-stopped {
   overflow: clip;
 }
+/* Chat open as a full-screen sheet on phones: no page scroll underneath
+   (covers reduced motion, where Lenis is off). */
+@media (max-width: 639px) {
+  html[data-chat-open] {
+    overflow: hidden;
+  }
+}
 
 /* ------------------------------------------------------------------ *
  * Typography helpers

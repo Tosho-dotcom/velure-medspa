@@ -5,6 +5,7 @@ Thaus Project #001. A minimal, luxury, single-page med spa site with a live book
 ## Source of truth
 - `specs/velure_site_spec.json` — brand, tokens, sections, copy, motion, a11y, performance.
 - `specs/velure_booking_spec.json` — booking form fields, rules, states, request/response contract.
+- `specs/velure_chat_spec.json` — chat assistant: /api/chat contract, widget UI, availability webhook.
 - `n8n/` — backend workflows (do not edit from the frontend side; the contract is in the booking spec).
 - Copy is final English copy. Do not invent new claims, prices or testimonials.
 
@@ -20,7 +21,7 @@ Next.js App Router + TypeScript strict · Tailwind v4 (tokens as CSS variables) 
 - Colors only via tokens (`bg-ivory`, `text-espresso`, etc.). No raw hex in components.
 - Images only via `next/image`. Videos: muted, loop, playsInline, poster, one source chosen on mount.
 - Forms: one zod schema per form in `src/lib/*-schema.ts`, shared types, `postJSON` helper in `src/lib/submit.ts` with 15s timeout.
-- Webhook URLs only from `process.env.NEXT_PUBLIC_N8N_*`. Never hardcode.
+- Webhook URLs only from `process.env.NEXT_PUBLIC_N8N_*`. Never hardcode. Exception: the chat webhook and its secret are server-only (`N8N_CHAT_WEBHOOK_URL`, `N8N_CHAT_SECRET`) and are used only in `src/app/api/chat/route.ts`.
 - Accessibility: visible labels, aria-live for form status, focus trap in panel, ESC closes, keyboard-reachable treatment rows.
 
 ## Definition of done per section

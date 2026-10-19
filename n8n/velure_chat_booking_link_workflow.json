@@ -1,0 +1,68 @@
+{
+  "name": "Velure Chat — Booking Link",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "treatmentId",
+              "type": "string"
+            },
+            {
+              "name": "date",
+              "type": "string"
+            },
+            {
+              "name": "time",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "e59c1556-ef69-54c6-b669-5698454f3cb7",
+      "name": "When Called by Chat",
+      "notes": "Called by the suggest_booking tool in 'Velure Chat Assistant'."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Velure — validate a Book button the assistant wants to show.\n// The website only renders a button for an action that passed this check.\nconst TREATMENTS = {\n  'signature-glow-facial': 'Signature Glow Facial',\n  'wrinkle-relaxers': 'Wrinkle Relaxers',\n  'dermal-fillers': 'Dermal Fillers',\n  'collagen-microneedling': 'Collagen Microneedling',\n  'laser-rejuvenation': 'Laser Rejuvenation',\n  'body-contouring': 'Body Contouring',\n  'consultation': 'Consultation',\n};\nconst SLOTS = ['09:00','09:30','10:00','10:30','11:00','11:30','12:00','12:30','13:00','13:30',\n  '14:00','14:30','15:00','15:30','16:00','16:30','17:00','17:30','18:00'];\n\nconst PHX_OFFSET_MS = 7 * 3600 * 1000;\nconst ymd = (d) => d.toISOString().slice(0, 10);\nconst addDays = (key, n) => {\n  const [y, m, d] = key.split('-').map(Number);\n  return ymd(new Date(Date.UTC(y, m - 1, d + n)));\n};\nconst isSunday = (key) => new Date(key + 'T12:00:00Z').getUTCDay() === 0;\nconst today = ymd(new Date(Date.now() - PHX_OFFSET_MS));\nconst min = addDays(today, 1);\nconst max = addDays(today, 60);\n\nconst j = $input.first().json;\nconst s = (v) => (v === null || v === undefined ? '' : String(v).trim());\nconst empty = (v) => ['', 'null', 'none', 'undefined', 'n/a'].includes(v.toLowerCase());\n\nconst treatmentId = s(j.treatmentId).toLowerCase();\nlet date = s(j.date);\nlet time = s(j.time);\nif (empty(date)) date = '';\nif (empty(time)) time = '';\nif (/^\\d:\\d{2}$/.test(time)) time = '0' + time;\n\nif (!TREATMENTS[treatmentId]) {\n  return [{ json: { ok: false, error: `Unknown treatmentId \"${treatmentId}\". Use one of: ${Object.keys(TREATMENTS).join(', ')}.` } }];\n}\n\nconst notes = [];\nif (date && (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || date < min || date > max || isSunday(date))) {\n  notes.push(`Date ${date} cannot be booked online (${min} to ${max}, Monday to Saturday), so the button opens without a date.`);\n  date = '';\n}\nif (time && !SLOTS.includes(time)) {\n  notes.push(`Time ${time} is not a start time, so the button opens without a time.`);\n  time = '';\n}\nif (time && !date) {\n  notes.push('A time without a date was dropped.');\n  time = '';\n}\n\nreturn [{ json: {\n  ok: true,\n  action: { type: 'book', treatmentId, date: date || null, time: time || null },\n  message: 'A Book button is now shown under your reply. The visitor finishes the booking in the panel.',\n  notes: notes.join(' '),\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        200
+      ],
+      "id": "589a817d-24fe-54e1-a846-61497101141e",
+      "name": "Validate Booking Link",
+      "notes": "Validates the button the assistant wants to show. The chat workflow only forwards an action from a call that returned ok: true."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Called by Chat": {
+      "main": [
+        [
+          {
+            "node": "Validate Booking Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Phoenix"
+  },
+  "tags": []
+}

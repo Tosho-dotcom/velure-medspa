@@ -8,13 +8,16 @@ import { XIcon } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { BookingForm } from "@/components/forms/BookingForm";
 import { useSmoothScroll } from "@/components/motion/SmoothScroll";
+import type { BookingPrefill } from "@/components/booking/BookingProvider";
 
 /** Staggers the panel contents in once the Sheet has mounted them. */
 function PanelBody({
   treatmentId,
+  prefill,
   onClose,
 }: {
   treatmentId?: string;
+  prefill?: BookingPrefill;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -62,7 +65,13 @@ function PanelBody({
         </SheetDescription>
       </div>
       <div data-panel-in>
-        <BookingForm variant="panel" treatmentId={treatmentId} autoFocus onClose={onClose} />
+        <BookingForm
+          variant="panel"
+          treatmentId={treatmentId}
+          prefill={prefill}
+          autoFocus
+          onClose={onClose}
+        />
       </div>
     </div>
   );
@@ -71,10 +80,12 @@ function PanelBody({
 export function BookingPanel({
   open,
   treatmentId,
+  prefill,
   onOpenChange,
 }: {
   open: boolean;
   treatmentId?: string;
+  prefill?: BookingPrefill;
   onOpenChange: (open: boolean) => void;
 }) {
   const { stop, start } = useSmoothScroll();
@@ -106,7 +117,11 @@ export function BookingPanel({
         >
           <XIcon className="size-4" strokeWidth={1.25} />
         </SheetClose>
-        <PanelBody treatmentId={treatmentId} onClose={() => onOpenChange(false)} />
+        <PanelBody
+          treatmentId={treatmentId}
+          prefill={prefill}
+          onClose={() => onOpenChange(false)}
+        />
       </SheetContent>
     </Sheet>
   );

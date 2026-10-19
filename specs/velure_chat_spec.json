@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "component": "Website chat assistant (ChatWidget) + live slot availability in the booking form",
+    "version": "1.0",
+    "date": "2026-10-19",
+    "status": "Implemented in this commit. This spec is the contract to keep it working.",
+    "model": "Unnamed assistant. Answers from a Notion knowledge base, checks free times in Velure Bookings, shows a Book button that opens the booking panel prefilled, and turns questions it cannot answer into contact requests. It never books on its own."
+  },
+
+  "architecture": {
+    "flow": [
+      "Browser ChatWidget → POST /api/chat (same origin) { sessionId, message }",
+      "/api/chat checks Origin, validates, rate-limits (Upstash, optional), forwards to n8n with header X-Velure-Secret",
+      "n8n 'Velure Chat Assistant': Validate & Limit → Notion KB + System Prompt (10 min cache) → AI Agent (Claude Haiku, memory per sessionId, 3 tools) → Format Reply → { reply, action? } → log to Velure Chat Logs",
+      "Tools are sub-workflows: check_availability → 'Velure — Availability', suggest_booking → 'Velure Chat — Booking Link', save_contact_request → 'Velure Chat — Contact Request'",
+      "Booking form → GET n8n 'velure-availability?date=YYYY-MM-DD' → taken times are disabled before submit (409 check on submit stays)"
+    ],
+    "why_server_route": "The chat calls a paid model, so the n8n URL, its secret and the rate limits stay on the server. The other forms keep posting to n8n directly."
+  },
+
+  "contract": {
+    "request": { "sessionId": "8–64 chars [A-Za-z0-9_-] (crypto.randomUUID in sessionStorage)", "message": "1–500 chars" },
+    "response": {
+      "reply": "plain text, may contain \\n; URLs, emails and (480) 555-0142 are linkified",
+      "action": "optional { type: 'book', treatmentId, date: 'YYYY-MM-DD' | null, time: 'HH:mm' | null }. Present only when suggest_booking returned ok. Whitelisted again in src/lib/chat.ts (parseBookingAction) on the server and the client."
+    },
+    "status_codes": "200 reply · 400 invalid input · 403 bad origin · 429 rate limited (route or n8n caps) · 500/502 assistant unavailable. All carry { reply } so the widget always shows a message."
+  },
+
+  "frontend": {
+    "files": {
+      "src/app/api/chat/route.ts": "Origin check (localhost:3000, https://velure-medspa*.vercel.app, NEXT_PUBLIC_SITE_URL, CHAT_ALLOWED_ORIGINS), Upstash limits 10/min/IP, 60/day/IP, 30/day/session (fail open), 30 s upstream timeout.",
+      "src/components/chat/ChatWidget.tsx": "Launcher + panel. Mounted in layout.tsx inside BookingProvider.",
+      "src/lib/chat.ts": "Types, parseBookingAction, bookingActionLabel.",
+      "src/lib/availability.ts": "fetchTakenTimes(date) → string[] | null (8 s timeout).",
+      "src/components/booking/BookingProvider.tsx": "open(treatmentId?, prefill?: { date, time }).",
+      "src/components/forms/BookingForm.tsx": "prefill prop (wins over a saved draft) + live taken times per date; a prefilled time that is taken is cleared with the existing slot_taken message."
+    },
+    "launcher": {
+      "position": "fixed bottom-6, right var(--gutter), 56px circle, espresso with gold-light/40 hairline, ivory MessageCircle icon (stroke 1.25), hover gold. z-40 (under the Sheet overlay, mobile menu, nav and preloader).",
+      "visibility": "Hidden while the hero (#top) is more than 35% in view (the hero owns that corner with the scroll cue) and while the booking panel is open. Fades/slides in 0.5s; no motion with reduced motion."
+    },
+    "panel": {
+      "desktop": "392px wide, max 600px tall, above the launcher, ivory, stone border, radius 24px, shadow-soft. Launcher turns into a close button.",
+      "mobile_max_639px": "Full screen above the nav (z-90), follows visualViewport so the input sits on the keyboard, page scroll paused (lenis.stop + html[data-chat-open] overflow hidden).",
+      "header": "Eyebrow 'Velure Med Spa' (gold) + Fraunces 'Questions, welcome.' + round close button.",
+      "messages": "Assistant: sand bubble. Visitor: espresso bubble, ivory text. Typing: three pulsing dots.",
+      "greeting": "Hello. I can help with treatments, prices and free appointment times, and open the booking panel for you. What would you like to know?",
+      "quick_questions": ["Help me choose a treatment", "What's free this week?", "Prices and durations", "Hours and location"],
+      "book_button": "Outlined pill under the assistant message, label from bookingActionLabel, e.g. 'Book Laser Rejuvenation · Tue, Oct 27 · 11:00 AM'. Click → close chat → booking.open(treatmentId, { date, time }).",
+      "footer_note": "AI assistant, may make mistakes. Velure is a demo by Thaus; conversations may be saved. + 'Contact form' link (scrolls to #contact).",
+      "behaviour": "Enter sends, Shift+Enter new line, ESC closes, focus to input on open and back to the launcher on close, history and sessionId in sessionStorage (velure_chat_session, velure_chat_messages), scroll area has data-lenis-prevent."
+    }
+  },
+
+  "n8n": {
+    "workflows": {
+      "n8n/velure_chat_workflow.json": "Velure Chat Assistant — POST /webhook/velure-chat (Header Auth)",
+      "n8n/velure_availability_workflow.json": "Velure — Availability — tool + public GET /webhook/velure-availability",
+      "n8n/velure_chat_booking_link_workflow.json": "Velure Chat — Booking Link — validates the Book button",
+      "n8n/velure_chat_contact_request_workflow.json": "Velure Chat — Contact Request — Velure Leads (Source 'Chat assistant') + owner email + auto-reply"
+    },
+    "notion": {
+      "page": "Velure Med Spa — CRM / Velure AI Assistant",
+      "knowledge_base": "Knowledge Base page — facts only, callouts are ignored. Booking ids must match src/lib/treatments.ts.",
+      "system_prompt": "System Prompt page — only the code block is used; {{KNOWLEDGE_BASE}} is replaced; no other curly braces.",
+      "chat_logs": "Velure Chat Logs database (Message, Full message, Reply, Action, Tools, Session ID, Created)."
+    },
+    "availability_rules": "Same as booking: America/Phoenix, Mon–Sat, 09:00–18:00 starts every 30 min, tomorrow to +60 days. A slot is taken when a booking with Status = Confirmed has that Slot key. Tool checks at most 5 open days per call.",
+    "date_context": "The AI Agent system message appends the current Scottsdale date/time and the next 8 dates on every call (not cached), so 'this Friday' resolves correctly."
+  },
+
+  "env": {
+    "N8N_CHAT_WEBHOOK_URL": "server only — https://<n8n>/webhook/velure-chat",
+    "N8N_CHAT_SECRET": "server only — same value as the n8n Header Auth credential 'Velure Chat Secret' (header X-Velure-Secret)",
+    "NEXT_PUBLIC_N8N_AVAILABILITY_WEBHOOK": "https://<n8n>/webhook/velure-availability (optional: without it the form only uses the 409 check)",
+    "UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN": "optional, recommended (KV_REST_API_* also accepted). Can share the Thaus Upstash store; keys are prefixed velure:chat:*",
+    "CHAT_ALLOWED_ORIGINS": "optional, comma-separated extra origins for a custom domain (with and without www)"
+  },
+
+  "acceptance": [
+    "npm run build passes with zero TypeScript and ESLint errors.",
+    "Launcher hidden over the hero, visible after scrolling, hidden while the booking panel is open.",
+    "'What's free this week?' returns real free times from Notion and a Book button; clicking it opens the panel with treatment, date and time filled in.",
+    "Taken times are struck through in the panel as soon as a date is chosen.",
+    "The assistant never claims a booking is made and never shows a Book button without a successful suggest_booking call.",
+    "A medical-suitability question gets no individual advice; the assistant offers a consultation and a contact request; the request lands in Velure Leads with Source 'Chat assistant'.",
+    "POST /api/chat without an allowed Origin returns 403.",
+    "Reduced motion: no launcher or panel animation; mobile 375px: full-screen sheet, input above the keyboard."
+  ]
+}
